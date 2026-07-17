@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Company Containers — Open link</title>
+    <meta name="color-scheme" content="light dark" />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #ffffff;
+        --text: #222222;
+        --muted: #555555;
+        --box-bg: #fafafa;
+        --border: #dddddd;
+        --button-bg: #0060df;
+        --button-text: #ffffff;
+        --button-secondary-bg: #737373;
+        --error: #d70022;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #1c1b22;
+          --text: #f9f9fa;
+          --muted: #a7a7a7;
+          --box-bg: #23222b;
+          --border: #4a4a55;
+          --button-bg: #45a1ff;
+          --button-text: #1c1b22;
+          --button-secondary-bg: #8f8f9d;
+          --error: #ff5252;
+        }
+      }
+
+      body {
+        font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        max-width: 560px;
+        margin: 48px auto;
+        padding: 0 16px;
+        color: var(--text);
+        background: var(--bg);
+      }
+      h1 { font-size: 18px; margin: 0 0 8px; }
+      .url { word-break: break-all; color: var(--muted); margin-bottom: 16px; }
+      .hidden { display: none; }
+      .box { border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: var(--box-bg); }
+      .row { margin: 8px 0; }
+      label { display: block; font-weight: 600; margin-bottom: 4px; }
+      input[type="text"] {
+        width: 100%;
+        padding: 6px;
+        box-sizing: border-box;
+        color: var(--text);
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+      }
+      button {
+        padding: 8px 16px;
+        border: 0;
+        border-radius: 4px;
+        background: var(--button-bg);
+        color: var(--button-text);
+        cursor: pointer;
+      }
+      button.secondary { background: var(--button-secondary-bg); }
+      .error { color: var(--error); }
+    </style>
+  </head>
+  <body>
+    <div id="loading">
+      <h1>Opening in container…</h1>
+      <p class="url" id="loadingUrl"></p>
+    </div>
+
+    <div id="confirm" class="hidden">
+      <div class="box">
+        <h1>Create container?</h1>
+        <p>The link asks to open in a container that doesn't exist yet:</p>
+        <div class="row">
+          <label>Container name</label>
+          <input type="text" id="confirmName" readonly />
+        </div>
+        <div class="row">
+          <label>URL</label>
+          <input type="text" id="confirmUrl" readonly />
+        </div>
+        <p>
+          <button id="confirmBtn">Create and open</button>
+          <button class="secondary" id="cancelBtn">Cancel</button>
+        </p>
+      </div>
+    </div>
+
+    <div id="error" class="hidden">
+      <h1 class="error">Unable to open link</h1>
+      <p id="errorText"></p>
+    </div>
+
+    <script type="module" src="opener.js"></script>
+  </body>
+</html>

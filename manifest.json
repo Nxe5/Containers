@@ -1,0 +1,48 @@
+{
+  "manifest_version": 2,
+  "name": "Company Containers",
+  "version": "1.0.0",
+  "description": "Auto-isolate Google, Microsoft, and Meta browsing in containers; unmatched sites open in temporary containers.",
+  "homepage_url": "https://github.com/honsiorovskyi/open-url-in-container",
+  "icons": {
+    "48": "src/icons/icon.svg",
+    "96": "src/icons/icon.svg"
+  },
+  "browser_action": {
+    "default_title": "Company Containers",
+    "default_popup": "src/popup/popup.html",
+    "default_icon": {
+      "16": "src/icons/icon.svg",
+      "32": "src/icons/icon.svg"
+    }
+  },
+  "background": {
+    "page": "src/background/background.html"
+  },
+  "options_ui": {
+    "page": "src/options/options.html",
+    "open_in_tab": true
+  },
+  "permissions": [
+    "contextualIdentities",
+    "cookies",
+    "storage",
+    "tabs",
+    "webRequest",
+    "webRequestBlocking",
+    "<all_urls>"
+  ],
+  "protocol_handlers": [
+    {
+      "protocol": "ext+container",
+      "name": "Company Containers",
+      "uriTemplate": "/src/opener/opener.html#%s"
+    }
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "company-containers@example.com",
+      "strict_min_version": "91.0"
+    }
+  }
+}

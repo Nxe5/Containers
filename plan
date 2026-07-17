@@ -1,0 +1,314 @@
+# Building a Unified Container Extension: Google, Microsoft & Meta Auto-Isolation
+
+This document specs out a Firefox WebExtension that combines three behaviors into one:
+
+1. **Predefined company containers** (Google, Microsoft, Meta) that domains auto-assign into
+2. **Fallback to a Temporary Container** for anything not matched to a known company
+3. **External link handling** so links opened from outside Firefox land in the right container too
+
+---
+
+## 1. Core Concept
+
+Instead of manually creating containers, the extension ships with **default container definitions** for major tracking/ad companies, and a rule engine that assigns domains to them automatically the moment a tab navigates there.
+
+```
+Domain matched to Google?    → Container: "Google"
+Domain matched to Microsoft? → Container: "Microsoft"
+Domain matched to Meta?      → Container: "Meta"
+No match?                    → Spin up (or reuse) a Temporary Container
+```
+
+This means cookies, local storage, and login sessions for Google properties never leak into Microsoft properties, Meta properties, or your general browsing — and anything unrecognized gets thrown into a disposable container that's wiped when closed.
+
+---
+
+## 2. Domain Lists Per Company
+
+These are the domains you'd seed into `storage.local` as default rules. This is not exhaustive (both companies own hundreds of regional/marketing domains), but it covers the properties people actually navigate to and use with logged-in sessions.
+
+### Google
+
+| Property | Domain(s) |
+|---|---|
+| Search | `google.com`, `google.co.uk`, `google.ca`, (all `google.*` ccTLDs) |
+| Gmail | `mail.google.com` |
+| YouTube | `youtube.com`, `youtu.be`, `youtube-nocookie.com`, `ytimg.com` |
+| Drive / Docs / Sheets / Slides | `drive.google.com`, `docs.google.com` |
+| Maps | `maps.google.com`, `maps.googleapis.com` |
+| Photos | `photos.google.com` |
+| Calendar | `calendar.google.com` |
+| Google Cloud / Firebase | `cloud.google.com`, `console.cloud.google.com`, `firebase.google.com` |
+| Play Store | `play.google.com` |
+| Chrome Web Store | `chrome.google.com` |
+| Analytics/Ads (tracking infra) | `googletagmanager.com`, `doubleclick.net`, `googlesyndication.com`, `google-analytics.com`, `googleadservices.com` |
+| Android | `android.com` |
+| Blogger | `blogger.com`, `blogspot.com` |
+| Google Fi | `fi.google.com` |
+| Waze (Google-owned) | `waze.com` |
+| Nest | `home.nest.com` |
+| Fitbit (Google-owned) | `fitbit.com` |
+
+### Microsoft
+
+| Property | Domain(s) |
+|---|---|
+| Search / Portal | `microsoft.com`, `bing.com`, `msn.com` |
+| Outlook / Hotmail / Live | `outlook.com`, `outlook.office.com`, `hotmail.com`, `live.com` |
+| Office 365 | `office.com`, `office365.com`, `sharepoint.com` |
+| OneDrive | `onedrive.live.com`, `1drv.ms` |
+| Teams | `teams.microsoft.com`, `teams.live.com` |
+| Azure | `portal.azure.com`, `azure.microsoft.com` |
+| Xbox | `xbox.com`, `account.xbox.com` |
+| GitHub (Microsoft-owned) | `github.com`, `githubusercontent.com`, `githubassets.com` |
+| LinkedIn (Microsoft-owned) | `linkedin.com`, `licdn.com` |
+| Skype | `skype.com`, `web.skype.com` |
+| Visual Studio | `visualstudio.com`, `dev.azure.com` |
+| MSN | `msn.com` |
+| Windows | `windows.com`, `windowsupdate.com` |
+| Bing Ads / Microsoft Ads | `bat.bing.com`, `ads.microsoft.com` |
+| Minecraft (Microsoft-owned) | `minecraft.net` |
+| Activision Blizzard (Microsoft-owned) | `activisionblizzard.com`, `battle.net` |
+
+### Meta
+
+| Property | Domain(s) |
+|---|---|
+| Facebook | `facebook.com`, `fb.com`, `fbcdn.net`, `fbsbx.com` |
+| Instagram | `instagram.com`, `cdninstagram.com` |
+| WhatsApp | `whatsapp.com`, `web.whatsapp.com` |
+| Messenger | `messenger.com` |
+| Meta Quest / Oculus | `oculus.com`, `meta.com` |
+| Meta Business Suite / Ads | `business.facebook.com`, `ads.facebook.com`, `atdmt.com` |
+| Threads | `threads.net` |
+| Workplace | `workplace.com` |
+
+---
+
+## 3. Extension Architecture
+
+### 3.1 Manifest (v2/v3 hybrid, Firefox uses v2 style contextualIdentities today)
+
+```json
+{
+  "manifest_version": 2,
+  "name": "Company Containers",
+  "version": "1.0.0",
+  "permissions": [
+    "contextualIdentities",
+    "cookies",
+    "tabs",
+    "webRequest",
+    "webRequestBlocking",
+    "storage",
+    "<all_urls>"
+  ],
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "browser_specific_settings": {
+    "gecko": { "id": "company-containers@example.com" }
+  }
+}
+```
+
+### 3.2 Data Model
+
+Store rules as a flat lookup table, keyed by a normalized hostname pattern:
+
+```js
+const DEFAULT_RULES = {
+  "google": {
+    color: "blue",
+    icon: "circle",
+    domains: ["google.com", "youtube.com", "gmail.com", "drive.google.com", "..."]
+  },
+  "microsoft": {
+    color: "turquoise",
+    icon: "briefcase",
+    domains: ["microsoft.com", "outlook.com", "github.com", "linkedin.com", "..."]
+  },
+  "meta": {
+    color: "red",
+    icon: "fingerprint",
+    domains: ["facebook.com", "instagram.com", "whatsapp.com", "..."]
+  }
+};
+```
+
+At install time, iterate this object and call `browser.contextualIdentities.create()` once per company to generate the actual container objects, then persist the returned `cookieStoreId` values in `storage.local` so you're not recreating containers on every browser start.
+
+```js
+async function ensureContainersExist() {
+  const existing = await browser.contextualIdentities.query({});
+  for (const [name, rule] of Object.entries(DEFAULT_RULES)) {
+    if (!existing.find(c => c.name.toLowerCase() === name)) {
+      const identity = await browser.contextualIdentities.create({
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        color: rule.color,
+        icon: rule.icon
+      });
+      await saveContainerId(name, identity.cookieStoreId);
+    }
+  }
+}
+```
+
+### 3.3 The Reassignment Engine
+
+Firefox does not allow changing a tab's container after creation — you have to close the original tab and open a new one in the target container. This is the same mechanism Multi-Account Containers uses under the hood.
+
+```js
+browser.webRequest.onBeforeRequest.addListener(
+  handleNavigation,
+  { urls: ["<all_urls>"], types: ["main_frame"] },
+  ["blocking"]
+);
+
+async function handleNavigation(details) {
+  const url = new URL(details.url);
+  const targetContainer = matchDomainToContainer(url.hostname);
+  const tab = await browser.tabs.get(details.tabId);
+  const currentCookieStoreId = tab.cookieStoreId;
+
+  if (targetContainer && targetContainer !== currentCookieStoreId) {
+    await reopenTabInContainer(tab, details.url, targetContainer);
+    return { cancel: true };
+  }
+
+  if (!targetContainer && !isTemporaryContainer(currentCookieStoreId)) {
+    const tempContainer = await createTemporaryContainer();
+    await reopenTabInContainer(tab, details.url, tempContainer);
+    return { cancel: true };
+  }
+
+  return {};
+}
+
+function matchDomainToContainer(hostname) {
+  for (const [name, rule] of Object.entries(DEFAULT_RULES)) {
+    if (rule.domains.some(d => hostname === d || hostname.endsWith("." + d))) {
+      return getSavedContainerId(name);
+    }
+  }
+  return null;
+}
+
+async function reopenTabInContainer(tab, url, cookieStoreId) {
+  await browser.tabs.create({
+    url,
+    cookieStoreId,
+    index: tab.index,
+    active: tab.active,
+    windowId: tab.windowId
+  });
+  await browser.tabs.remove(tab.id);
+}
+```
+
+### 3.4 Temporary Container Fallback
+
+Mirrors Temporary Containers' approach: create a uniquely-named container on demand, tag it in `storage.local` as temporary, and garbage-collect it once its last tab closes.
+
+```js
+let tempContainerCounter = 0;
+
+async function createTemporaryContainer() {
+  const identity = await browser.contextualIdentities.create({
+    name: `Temp ${++tempContainerCounter}`,
+    color: "toolbar",
+    icon: "circle"
+  });
+  await markAsTemporary(identity.cookieStoreId);
+  return identity.cookieStoreId;
+}
+
+browser.tabs.onRemoved.addListener(async (tabId) => {
+  const remainingTabs = await browser.tabs.query({});
+  const allCookieStoreIds = new Set(remainingTabs.map(t => t.cookieStoreId));
+  const tempIds = await getAllTemporaryContainerIds();
+
+  for (const id of tempIds) {
+    if (!allCookieStoreIds.has(id)) {
+      await browser.contextualIdentities.remove(id);
+      await unmarkTemporary(id);
+    }
+  }
+});
+```
+
+### 3.5 External Link Handling
+
+This is the piece that needs OS-level integration, not just background-script logic, because it has to catch links clicked from *outside* the browser (email clients, Slack desktop, terminal, etc.).
+
+**Approach**: register a custom protocol handler, same pattern as "Open External Links in a Container."
+
+In `manifest.json`:
+```json
+"protocol_handlers": [
+  {
+    "protocol": "ext+container",
+    "name": "Company Containers",
+    "uriTemplate": "https://dummy/#%s"
+  }
+]
+```
+
+Then a small companion launcher script (bash on Linux, a tiny compiled binary on macOS/Windows registered as the default `http`/`https` handler) rewrites incoming URLs into the `ext+container:` scheme before handing them to Firefox, e.g.:
+
+```bash
+#!/bin/bash
+URL="$1"
+firefox "ext+container:name=Google&url=$URL"
+```
+
+The extension's background script listens for this custom scheme, parses out `name` and `url`, matches `name` against `DEFAULT_RULES`, and opens the tab in that container — falling back to the temporary-container logic if no match is found, exactly like normal in-browser navigation.
+
+---
+
+## 4. Rule Precedence
+
+When more than one signal could apply, resolve in this order (highest priority first):
+
+1. **User-defined override** (a manual "always open this domain in X" rule the user set, which should win over defaults)
+2. **Company default rule match** (Google / Microsoft / Meta domain lists above)
+3. **External-link container hint** (from the `ext+container:` URL, if present)
+4. **Temporary container fallback** (nothing else matched)
+
+---
+
+## 5. UI Considerations
+
+- Popup panel listing the three default containers plus any user-created ones, each with an on/off toggle and an "add domain" button
+- A settings page for editing the domain lists (since company-owned domains change over time — e.g. Meta rebranding, Microsoft acquisitions)
+- A visible indicator (colored tab, per Firefox's native container UI) so it's obvious at a glance which company-context a tab is in
+- An "isolate everything else" toggle to control whether unmatched domains go to temporary containers or your regular default container
+
+---
+
+## 6. Maintenance Reality Check
+
+Domain lists like the ones above go stale. Companies:
+- Acquire new products (Microsoft buying Activision Blizzard, Meta rebranding Oculus → Meta Quest)
+- Spin up new CDN/tracking subdomains regularly
+- Sometimes split or consolidate domains (Twitter → X being the classic recent example, though that's neither company here)
+
+Practical approach: ship the domain lists as a separate JSON file bundled with the extension, and optionally support fetching an updated version from a GitHub-hosted JSON file so lists can be refreshed without a full extension update (similar to how ad-blockers refresh filter lists).
+
+---
+
+## 7. Suggested Build Order
+
+1. Fork **mozilla/multi-account-containers** as the base (handles container CRUD + rule matching UI already)
+2. Seed it with the three default containers + domain lists above instead of requiring manual container creation
+3. Port in the temporary-container creation/cleanup logic from **stoically/temporary-containers**
+4. Add the protocol handler + launcher script from **honsiorovskyi/open-url-in-container** for external link support
+5. Wire precedence logic so user overrides > company defaults > external hints > temporary fallback
+
+---
+
+## Sources for the base extensions
+
+- Multi-Account Containers: https://github.com/mozilla/multi-account-containers
+- Temporary Containers: https://github.com/stoically/temporary-containers
+- Open External Links in a Container: https://github.com/honsiorovskyi/open-url-in-container

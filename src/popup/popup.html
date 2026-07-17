@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div id="app">
+      <!-- Home page -->
+      <div id="page-home" class="page">
+        <header>
+          <img src="../icons/icon.svg" alt="" width="20" height="20" />
+          <span>Company Containers</span>
+        </header>
+
+        <section class="actions">
+          <button class="primary action-btn" data-action="new">Open new tab in…</button>
+          <button class="primary action-btn" data-action="reopen">Reopen this site in…</button>
+          <button class="primary action-btn" data-action="always">Always open this site in…</button>
+          <p id="siteHint" class="hint">—</p>
+        </section>
+
+        <section class="toggles">
+          <label class="toggle">
+            <input type="checkbox" id="isolateToggle" />
+            <span>Auto isolate all unmatched tabs</span>
+          </label>
+          <label class="toggle">
+            <input type="checkbox" id="replaceToggle" />
+            <span>Replace tab instead of opening new one</span>
+          </label>
+        </section>
+
+        <section class="container-list-section">
+          <h2>Containers</h2>
+          <input type="search" id="homeSearch" placeholder="Search containers…" />
+          <div id="homeContainers" class="container-list"></div>
+        </section>
+
+        <footer>
+          <a href="#" id="openOptions">Options</a>
+        </footer>
+      </div>
+
+      <!-- Container selection page -->
+      <div id="page-select" class="page hidden">
+        <header class="select-header">
+          <button id="backButton" class="icon-btn" aria-label="Back">←</button>
+          <span id="selectTitle">Choose container</span>
+        </header>
+        <input type="search" id="selectSearch" placeholder="Search containers…" />
+        <div id="selectContainers" class="container-list"></div>
+      </div>
+    </div>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

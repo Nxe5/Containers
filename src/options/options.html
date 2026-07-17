@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Company Containers — Options</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Company Containers</h1>
+      <p class="lead">
+        Google, Microsoft, and Meta tabs open in their own containers. Everything
+        else can open in a disposable Temporary Container.
+      </p>
+
+      <section>
+        <h2>Global settings</h2>
+        <label class="toggle">
+          <input type="checkbox" id="isolateUnmatched" />
+          <span>Isolate unmatched sites in a Temporary Container</span>
+        </label>
+
+        <div class="grid three">
+          <label>
+            Temp prefix
+            <input type="text" id="tempPrefix" />
+          </label>
+          <label>
+            Temp color
+            <select id="tempColor"></select>
+          </label>
+          <label>
+            Temp icon
+            <select id="tempIcon"></select>
+          </label>
+        </div>
+      </section>
+
+      <section>
+        <h2>Built-in company containers</h2>
+        <p class="hint">
+          One domain per line. Saving replaces the built-in list for that company.
+          Use the reset button to restore defaults.
+        </p>
+        <div id="companies"></div>
+      </section>
+
+      <section>
+        <h2>Custom containers</h2>
+        <p class="hint">
+          Add your own containers — e.g. Work, Banking, Shopping. Give each a
+          name, color, icon, and optional domain list. They behave exactly like
+          the built-in companies and show up in the popup.
+        </p>
+        <div id="customContainers"></div>
+        <button id="addCustomContainer" class="secondary">Add custom container</button>
+      </section>
+
+      <section>
+        <h2>User overrides</h2>
+        <p class="hint">Always open a specific hostname in a chosen container. Highest priority.</p>
+        <table id="userRules">
+          <thead>
+            <tr>
+              <th>Hostname / domain</th>
+              <th>Container</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <button id="addUserRule" class="secondary">Add override</button>
+      </section>
+
+      <section>
+        <h2>Maintenance</h2>
+        <button id="gcNow" class="secondary">Clean up empty Temporary Containers</button>
+        <span id="gcResult" class="status"></span>
+      </section>
+
+      <section class="danger">
+        <h2>Danger zone</h2>
+        <button id="resetAll" class="danger">Reset all settings to defaults</button>
+      </section>
+    </div>
+
+    <script type="module" src="options.js"></script>
+  </body>
+</html>
