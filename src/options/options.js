@@ -42,6 +42,19 @@ function wrapLabel(text, input) {
   return label;
 }
 
+// Wraps a button placed alongside <label> grid siblings with a hidden
+// spacer matching the label's text line, so the button lines up with the
+// input fields instead of stretching to fill (or floating low in) the row.
+function wrapFieldButton(button) {
+  const wrap = document.createElement('div');
+  wrap.className = 'field-btn-wrap';
+  const spacer = document.createElement('span');
+  spacer.className = 'field-btn-spacer';
+  spacer.innerHTML = '&nbsp;';
+  wrap.append(spacer, button);
+  return wrap;
+}
+
 function inputCell(type, value, placeholder) {
   const input = document.createElement('input');
   input.type = type;
@@ -49,6 +62,126 @@ function inputCell(type, value, placeholder) {
   input.placeholder = placeholder || '';
   input.autocomplete = 'off';
   return input;
+}
+
+function iconButton(symbol, label, variant) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = variant ? `icon-action-btn ${variant}` : 'icon-action-btn';
+  btn.textContent = symbol;
+  btn.title = label;
+  btn.setAttribute('aria-label', label);
+  return btn;
+}
+
+// Groups [label, input] pairs into a sequence of `.grid.three` rows, three
+// fields per row, for the payment/address form-card layouts.
+function buildFieldRows(fieldPairs, perRow = 3) {
+  const rows = [];
+  for (let i = 0; i < fieldPairs.length; i += perRow) {
+    const grid = document.createElement('div');
+    grid.className = 'grid three';
+    for (const [labelText, input] of fieldPairs.slice(i, i + perRow)) {
+      grid.appendChild(wrapLabel(labelText, input));
+    }
+    rows.push(grid);
+  }
+  return rows;
+}
+
+// --- CSV import --------------------------------------------------------
+// Minimal RFC4180-ish parser: quoted fields, escaped "" quotes, CRLF/LF.
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let field = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') {
+          field += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        field += c;
+      }
+    } else if (c === '"') {
+      inQuotes = true;
+    } else if (c === ',') {
+      row.push(field);
+      field = '';
+    } else if (c === '\n' || c === '\r') {
+      if (c === '\r' && text[i + 1] === '\n') i++;
+      row.push(field);
+      field = '';
+      if (row.some((cell) => cell !== '')) rows.push(row);
+      row = [];
+    } else {
+      field += c;
+    }
+  }
+  if (field !== '' || row.length) {
+    row.push(field);
+    if (row.some((cell) => cell !== '')) rows.push(row);
+  }
+  return rows;
+}
+
+function csvToObjects(text) {
+  const rows = parseCsv(text);
+  if (rows.length === 0) return [];
+  const headers = rows[0].map((h) => h.trim().toLowerCase());
+  return rows.slice(1).map((r) => {
+    const obj = {};
+    headers.forEach((h, idx) => {
+      obj[h] = (r[idx] || '').trim();
+    });
+    return obj;
+  });
+}
+
+function resolveContainerKey(value, containerOptions) {
+  if (!value) return null;
+  const v = value.trim().toLowerCase();
+  const match = containerOptions.find(
+    (o) => o.key && (o.key.toLowerCase() === v || o.label.toLowerCase() === v)
+  );
+  return match ? match.key : null;
+}
+
+function readFileAsText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error || new Error('file read failed'));
+    reader.readAsText(file);
+  });
+}
+
+function wireCsvImport(inputId, statusId, handler) {
+  const input = $(inputId);
+  const status = $(statusId);
+  input.addEventListener('change', async () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    status.textContent = 'Importing…';
+    try {
+      const text = await readFileAsText(file);
+      const rows = csvToObjects(text);
+      const summary = await handler(rows);
+      status.textContent = summary;
+    } catch (err) {
+      status.textContent = `Import failed: ${err.message}`;
+    } finally {
+      input.value = '';
+    }
+  });
 }
 
 function populateSelect(select, values, selected) {
@@ -150,7 +283,7 @@ function buildProxyBlock(key, proxyConfig) {
   authGrid.append(
     wrapLabel('Proxy username', userInput),
     wrapLabel('Proxy password', passInput),
-    saveBtn
+    wrapFieldButton(saveBtn)
   );
 
   wrap.append(grid, authGrid);
@@ -363,13 +496,21 @@ async function refreshVaultUI() {
   $('vaultLocked').classList.toggle('hidden', status.unlocked);
   $('credentialsSection').classList.toggle('hidden', !status.unlocked);
   $('paymentSection').classList.toggle('hidden', !status.unlocked);
+  $('addressesSection').classList.toggle('hidden', !status.unlocked);
 
   if (!status.unlocked) {
     $('vaultCreateBtn').classList.toggle('hidden', status.exists);
     $('vaultUnlockBtn').classList.toggle('hidden', !status.exists);
+    $('vaultConfirmWrap').classList.toggle('hidden', status.exists);
+    $('forgotPasswordLink').classList.toggle('hidden', !status.exists);
+    if (!status.exists) $('vaultResetConfirm').classList.add('hidden');
   } else {
+    $('vaultConfirmWrap').classList.add('hidden');
+    $('forgotPasswordLink').classList.add('hidden');
+    $('vaultResetConfirm').classList.add('hidden');
     await renderCredentials();
     await renderPaymentMethods();
+    await renderAddresses();
   }
 }
 
@@ -405,9 +546,7 @@ function buildCredentialRow(cred, containerOptions) {
   const passwordInput = inputCell('password', cred.password, 'password');
   const containerSelect = buildContainerSelect(containerOptions, cred.containerKey);
 
-  const saveBtn = document.createElement('button');
-  saveBtn.className = 'secondary small';
-  saveBtn.textContent = 'Save';
+  const saveBtn = iconButton('✓', 'Save');
   saveBtn.addEventListener('click', async () => {
     await vaultCall('vault-save-credential', {
       entry: {
@@ -421,9 +560,7 @@ function buildCredentialRow(cred, containerOptions) {
     await renderCredentials();
   });
 
-  const deleteBtn = document.createElement('button');
-  deleteBtn.className = 'danger small';
-  deleteBtn.textContent = 'Delete';
+  const deleteBtn = iconButton('✕', 'Delete', 'danger');
   deleteBtn.addEventListener('click', async () => {
     await vaultCall('vault-delete-credential', { id: cred.id });
     await renderCredentials();
@@ -448,20 +585,22 @@ function buildCredentialRow(cred, containerOptions) {
 
 async function renderPaymentMethods() {
   const result = await vaultCall('vault-list-payment-methods');
-  const tbody = $('paymentTable').querySelector('tbody');
-  tbody.innerHTML = '';
+  const list = $('paymentList');
+  list.innerHTML = '';
   if (!result.ok) return;
 
   const containerOptions = getContainerOptions();
   for (const pm of result.result) {
-    tbody.appendChild(buildPaymentRow(pm, containerOptions));
+    list.appendChild(buildPaymentCard(pm, containerOptions));
   }
 }
 
-function buildPaymentRow(pm, containerOptions) {
-  const tr = document.createElement('tr');
+function buildPaymentCard(pm, containerOptions) {
+  const card = document.createElement('div');
+  card.className = 'entry-card';
 
   const nickname = inputCell('text', pm.nickname, 'Nickname');
+  nickname.className = 'entry-title-input';
   const cardholder = inputCell('text', pm.cardholderName, 'Name on card');
   const cardNumber = inputCell('password', pm.cardNumber, 'Card number');
   const cvv = inputCell('password', pm.cvv, 'CVV');
@@ -469,9 +608,7 @@ function buildPaymentRow(pm, containerOptions) {
   const billing = inputCell('text', pm.billingAddress, 'Billing address');
   const containerSelect = buildContainerSelect(containerOptions, pm.containerKey);
 
-  const saveBtn = document.createElement('button');
-  saveBtn.className = 'secondary small';
-  saveBtn.textContent = 'Save';
+  const saveBtn = iconButton('✓', 'Save');
   saveBtn.addEventListener('click', async () => {
     await vaultCall('vault-save-payment-method', {
       entry: {
@@ -488,29 +625,125 @@ function buildPaymentRow(pm, containerOptions) {
     await renderPaymentMethods();
   });
 
-  const deleteBtn = document.createElement('button');
-  deleteBtn.className = 'danger small';
-  deleteBtn.textContent = 'Delete';
+  const deleteBtn = iconButton('✕', 'Delete', 'danger');
   deleteBtn.addEventListener('click', async () => {
     await vaultCall('vault-delete-payment-method', { id: pm.id });
     await renderPaymentMethods();
   });
 
-  [nickname, cardholder, cardNumber, cvv, expiry, billing].forEach((input) => {
-    const td = document.createElement('td');
-    td.appendChild(input);
-    tr.appendChild(td);
+  const header = document.createElement('div');
+  header.className = 'entry-header';
+  header.appendChild(nickname);
+  const actions = document.createElement('div');
+  actions.className = 'entry-actions';
+  actions.append(saveBtn, deleteBtn);
+  header.appendChild(actions);
+
+  card.appendChild(header);
+  card.append(
+    ...buildFieldRows([
+      ['Cardholder', cardholder],
+      ['Card number', cardNumber],
+      ['CVV', cvv],
+    ])
+  );
+  card.append(
+    ...buildFieldRows([
+      ['Expiry (MM/YY)', expiry],
+      ['Billing address', billing],
+      ['Container', containerSelect],
+    ])
+  );
+
+  return card;
+}
+
+async function renderAddresses() {
+  const result = await vaultCall('vault-list-addresses');
+  const list = $('addressesList');
+  list.innerHTML = '';
+  if (!result.ok) return;
+
+  const containerOptions = getContainerOptions();
+  for (const addr of result.result) {
+    list.appendChild(buildAddressCard(addr, containerOptions));
+  }
+}
+
+function buildAddressCard(addr, containerOptions) {
+  const card = document.createElement('div');
+  card.className = 'entry-card';
+
+  const label = inputCell('text', addr.label, 'Label (e.g. Home, Office)');
+  label.className = 'entry-title-input';
+  const recipient = inputCell('text', addr.recipientName, 'Recipient name');
+  const line1 = inputCell('text', addr.line1, 'Address line 1');
+  const line2 = inputCell('text', addr.line2, 'Address line 2');
+  const city = inputCell('text', addr.city, 'City');
+  const state = inputCell('text', addr.state, 'State / region');
+  const postalCode = inputCell('text', addr.postalCode, 'Postal code');
+  const country = inputCell('text', addr.country, 'Country');
+  const phone = inputCell('text', addr.phone, 'Phone');
+  const containerSelect = buildContainerSelect(containerOptions, addr.containerKey);
+
+  const saveBtn = iconButton('✓', 'Save');
+  saveBtn.addEventListener('click', async () => {
+    await vaultCall('vault-save-address', {
+      entry: {
+        id: addr.id,
+        label: label.value.trim(),
+        recipientName: recipient.value,
+        line1: line1.value,
+        line2: line2.value,
+        city: city.value,
+        state: state.value,
+        postalCode: postalCode.value,
+        country: country.value,
+        phone: phone.value,
+        containerKey: containerSelect.value || null,
+      },
+    });
+    await renderAddresses();
   });
 
-  const containerTd = document.createElement('td');
-  containerTd.appendChild(containerSelect);
-  tr.appendChild(containerTd);
+  const deleteBtn = iconButton('✕', 'Delete', 'danger');
+  deleteBtn.addEventListener('click', async () => {
+    await vaultCall('vault-delete-address', { id: addr.id });
+    await renderAddresses();
+  });
 
-  const actionsTd = document.createElement('td');
-  actionsTd.append(saveBtn, deleteBtn);
-  tr.appendChild(actionsTd);
+  const header = document.createElement('div');
+  header.className = 'entry-header';
+  header.appendChild(label);
+  const actions = document.createElement('div');
+  actions.className = 'entry-actions';
+  actions.append(saveBtn, deleteBtn);
+  header.appendChild(actions);
 
-  return tr;
+  card.appendChild(header);
+  card.append(
+    ...buildFieldRows([
+      ['Recipient', recipient],
+      ['Address line 1', line1],
+      ['Address line 2', line2],
+    ])
+  );
+  card.append(
+    ...buildFieldRows([
+      ['City', city],
+      ['State / region', state],
+      ['Postal code', postalCode],
+    ])
+  );
+  card.append(
+    ...buildFieldRows([
+      ['Country', country],
+      ['Phone', phone],
+      ['Container', containerSelect],
+    ])
+  );
+
+  return card;
 }
 
 // --- Native messaging token --------------------------------------------
@@ -631,13 +864,19 @@ async function init() {
 
   $('vaultCreateBtn').addEventListener('click', async () => {
     const password = $('vaultPasswordInput').value;
+    const confirmPassword = $('vaultConfirmInput').value;
     if (!password) return;
+    if (password !== confirmPassword) {
+      $('vaultError').textContent = "Passwords don't match.";
+      return;
+    }
     const result = await vaultCall('vault-create', { password });
     if (!result.ok) {
       $('vaultError').textContent = result.error;
       return;
     }
     $('vaultPasswordInput').value = '';
+    $('vaultConfirmInput').value = '';
     $('vaultError').textContent = '';
     await refreshVaultUI();
   });
@@ -661,6 +900,32 @@ async function init() {
     await refreshVaultUI();
   });
 
+  $('forgotPasswordLink').addEventListener('click', (e) => {
+    e.preventDefault();
+    $('vaultResetConfirm').classList.toggle('hidden');
+  });
+
+  $('vaultResetBtn').addEventListener('click', async () => {
+    if (
+      !confirm(
+        'This permanently deletes every saved credential, payment method, address, ' +
+          'and proxy password. There is no recovery. Continue?'
+      )
+    ) {
+      return;
+    }
+    const result = await vaultCall('vault-reset');
+    if (!result.ok) {
+      $('vaultError').textContent = result.error;
+      return;
+    }
+    $('vaultPasswordInput').value = '';
+    $('vaultConfirmInput').value = '';
+    $('vaultError').textContent = '';
+    $('vaultResetConfirm').classList.add('hidden');
+    await refreshVaultUI();
+  });
+
   $('addCredential').addEventListener('click', async () => {
     const result = await vaultCall('vault-save-credential', {
       entry: { website: '', account: '', password: '', containerKey: null },
@@ -681,6 +946,109 @@ async function init() {
       },
     });
     if (result.ok) await renderPaymentMethods();
+  });
+
+  $('addAddress').addEventListener('click', async () => {
+    const result = await vaultCall('vault-save-address', {
+      entry: {
+        label: '',
+        recipientName: '',
+        line1: '',
+        line2: '',
+        city: '',
+        state: '',
+        postalCode: '',
+        country: '',
+        phone: '',
+        containerKey: null,
+      },
+    });
+    if (result.ok) await renderAddresses();
+  });
+
+  wireCsvImport('importCredentialsCsv', 'importCredentialsStatus', async (rows) => {
+    const containerOptions = getContainerOptions();
+    const entries = rows
+      .filter((r) => r.website || r.account)
+      .map((r) => ({
+        website: r.website || '',
+        account: r.account || '',
+        password: r.password || '',
+        containerKey: resolveContainerKey(r.container, containerOptions),
+      }));
+    const result = await vaultCall('vault-import-credentials', { entries });
+    if (!result.ok) return `Import failed: ${result.error}`;
+    await renderCredentials();
+    return `Imported ${result.result.imported} credential(s).`;
+  });
+
+  wireCsvImport('importPaymentCsv', 'importPaymentStatus', async (rows) => {
+    const containerOptions = getContainerOptions();
+    const entries = rows
+      .filter((r) => r.nickname || r.cardnumber)
+      .map((r) => ({
+        nickname: r.nickname || '',
+        cardholderName: r.cardholdername || '',
+        cardNumber: r.cardnumber || '',
+        cvv: r.cvv || '',
+        expiry: r.expiry || '',
+        billingAddress: r.billingaddress || '',
+        containerKey: resolveContainerKey(r.container, containerOptions),
+      }));
+    const result = await vaultCall('vault-import-payment-methods', { entries });
+    if (!result.ok) return `Import failed: ${result.error}`;
+    await renderPaymentMethods();
+    return `Imported ${result.result.imported} payment method(s).`;
+  });
+
+  wireCsvImport('importAddressesCsv', 'importAddressesStatus', async (rows) => {
+    const containerOptions = getContainerOptions();
+    const entries = rows
+      .filter((r) => r.label || r.line1)
+      .map((r) => ({
+        label: r.label || '',
+        recipientName: r.recipientname || '',
+        line1: r.line1 || '',
+        line2: r.line2 || '',
+        city: r.city || '',
+        state: r.state || '',
+        postalCode: r.postalcode || '',
+        country: r.country || '',
+        phone: r.phone || '',
+        containerKey: resolveContainerKey(r.container, containerOptions),
+      }));
+    const result = await vaultCall('vault-import-addresses', { entries });
+    if (!result.ok) return `Import failed: ${result.error}`;
+    await renderAddresses();
+    return `Imported ${result.result.imported} address(es).`;
+  });
+
+  wireCsvImport('importContainersCsv', 'importContainersStatus', async (rows) => {
+    const custom = { ...(currentStatus.settings.customContainers || {}) };
+    let count = 0;
+    for (const r of rows) {
+      const key = (r.key || r.label || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      if (!key || BUILTIN_KEYS.has(key)) continue;
+      custom[key] = {
+        label: r.label || key,
+        color: COLORS.includes(r.color) ? r.color : 'toolbar',
+        icon: ICONS.includes(r.icon) ? r.icon : 'circle',
+        domains: (r.domains || '')
+          .split(';')
+          .map((d) => d.trim())
+          .filter(Boolean),
+        enabled: true,
+        cookieStoreId: custom[key]?.cookieStoreId || null,
+      };
+      count++;
+    }
+    await browser.runtime.sendMessage({
+      type: 'update-settings',
+      settings: { customContainers: custom },
+    });
+    await loadStatus();
+    renderCustomContainers();
+    return `Imported ${count} custom container(s).`;
   });
 
   $('regenerateToken').addEventListener('click', async () => {

@@ -147,18 +147,26 @@ credentials are stored in the encrypted vault (see below), not in plain
 settings, and are supplied automatically via `webRequest.onAuthRequired` when
 the vault is unlocked.
 
-## Vault: site credentials and payment methods
+## Vault: site credentials, payment methods, and addresses
 
-The Options page has **Site credentials** and **Payment methods** sections,
-each a simple table (website/account/password/container, and
-nickname/cardholder/card number/CVV/expiry/billing address/container
-respectively). Entries are tied to a container and stored in an **encrypted
-vault**, not in plain `browser.storage.local`:
+The Options page has three tables — **Site credentials**, **Payment
+methods**, and **Addresses** — each tied to a container and stored in an
+**encrypted vault**, not in plain `browser.storage.local`:
 
-- The vault is protected by a master password you choose the first time you
-  open the **Vault** section. That password is never stored anywhere — it's
-  used once to derive an AES-256-GCM key (via PBKDF2, 210k iterations) that
-  encrypts the vault contents at rest.
+- **Site credentials**: website / account / password / container.
+- **Payment methods**: nickname / cardholder / card number / CVV / expiry /
+  billing address / container.
+- **Addresses**: label / recipient / address lines / city / state / postal
+  code / country / phone / container — a per-container address book,
+  independent of payment methods (a payment method's billing-address field
+  stays free text; use this table when you want a reusable, assignable
+  address per container).
+
+To set it up: open Options → **Vault** and enter a master password —
+**Create vault** the first time, **Unlock** on later visits. That password is
+never stored anywhere; it's used once to derive an AES-256-GCM key (via
+PBKDF2, 210k iterations) that encrypts the vault contents at rest.
+
 - The decrypted vault only lives in the background page's memory for the
   current session. It locks automatically after 15 minutes of inactivity
   (`browser.idle`), and locking/reloading the browser clears it — you'll need
@@ -175,6 +183,25 @@ PCI-compliant system, there's no tokenization, and a bug or a compromised
 update could expose real card data. Treat your master password, this browser
 profile, and any backups of it with the same care you'd give the physical
 cards.
+
+### CSV import
+
+Each vault table (and Custom containers) has a CSV file input at the bottom
+of its section. The first row must be a header row; the `container` column
+matches an existing container by its label or key (case-insensitive) — rows
+with an unrecognized container are imported with no container assigned
+rather than failing the whole file.
+
+| Section | Headers |
+| --- | --- |
+| Site credentials | `website, account, password, container` |
+| Payment methods | `nickname, cardholderName, cardNumber, cvv, expiry, billingAddress, container` |
+| Addresses | `label, recipientName, line1, line2, city, state, postalCode, country, phone, container` |
+| Custom containers | `key, label, color, icon, domains` — `domains` is `;`-separated within the cell (commas are the CSV delimiter) |
+
+Imports are additive (existing rows are left alone) and there's no
+undo — export/back up first if you're bulk-loading a file you haven't
+reviewed.
 
 ## Native messaging bridge (external automation)
 

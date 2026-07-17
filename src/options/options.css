@@ -78,6 +78,15 @@ input[type="text"], input[type="password"], select, textarea {
   font: inherit;
   color: var(--text);
   background: var(--bg-card);
+  box-sizing: border-box;
+}
+
+/* Native <select> chrome renders at a different intrinsic height than a
+   text <input> even with identical padding/border — pin both to the same
+   height so mixed input/select rows (e.g. Temp prefix / Temp color) line
+   up instead of one looking taller than its neighbor. */
+input[type="text"], input[type="password"], select {
+  height: 34px;
 }
 
 textarea { min-height: 120px; resize: vertical; }
@@ -199,6 +208,87 @@ th, td {
   padding-top: 12px;
   border-top: 1px dashed var(--border-light);
 }
+
+/* Grid items stretch to fill their cell by default, which makes a lone
+   button next to taller <label>+<input> siblings balloon to match their
+   height/width. A hidden spacer matching the sibling label's text line
+   pushes the button down to line up with the inputs, sized to its content
+   instead of stretching. */
+.field-btn-wrap {
+  display: flex;
+  flex-direction: column;
+}
+.field-btn-spacer {
+  font-weight: 600;
+  margin-bottom: 4px;
+  visibility: hidden;
+}
+.field-btn-wrap button {
+  width: auto;
+  align-self: flex-start;
+}
+
+.entry-card {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.entry-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.entry-title-input {
+  font: inherit;
+  font-weight: 600;
+  padding: 4px 6px;
+  border: 1px solid var(--input-border);
+  border-radius: 4px;
+  background: var(--bg-card);
+  color: var(--text);
+  flex: 1;
+  min-width: 0;
+}
+
+.entry-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+button.icon-action-btn {
+  padding: 4px 9px;
+  font-size: 14px;
+  line-height: 1;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 4px;
+}
+button.icon-action-btn:hover {
+  background: var(--button-secondary-bg);
+}
+button.icon-action-btn.danger {
+  color: var(--button-danger-bg);
+  border-color: var(--button-danger-bg);
+}
+button.icon-action-btn.danger:hover {
+  background: var(--button-danger-bg);
+  color: var(--button-primary-text);
+}
+
+.csv-import {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border-light);
+}
+.csv-import label { font-weight: normal; }
+.csv-import input[type="file"] { display: block; margin-top: 4px; width: auto; }
 
 code {
   background: var(--button-secondary-bg);

@@ -435,6 +435,9 @@ async function handleMessage(message, sender, sendResponse) {
       vault.lockVault();
       return { ok: true };
 
+    case 'vault-reset':
+      return vault.resetVault();
+
     // --- Site credentials ---------------------------------------------
 
     case 'vault-list-credentials':
@@ -459,6 +462,26 @@ async function handleMessage(message, sender, sendResponse) {
 
     case 'vault-delete-payment-method':
       return vaultOp(() => vault.deletePaymentMethod(message.id));
+
+    case 'vault-import-credentials':
+      return vaultOp(() => vault.importCredentials(message.entries));
+
+    case 'vault-import-payment-methods':
+      return vaultOp(() => vault.importPaymentMethods(message.entries));
+
+    // --- Addresses ------------------------------------------------------
+
+    case 'vault-list-addresses':
+      return vaultOp(() => vault.listAddresses());
+
+    case 'vault-save-address':
+      return vaultOp(() => vault.saveAddress(message.entry));
+
+    case 'vault-delete-address':
+      return vaultOp(() => vault.deleteAddress(message.id));
+
+    case 'vault-import-addresses':
+      return vaultOp(() => vault.importAddresses(message.entries));
 
     // --- Proxy auth credentials (vault) + proxy config (plain settings) --
 

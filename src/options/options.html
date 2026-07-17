@@ -50,14 +50,64 @@
               Master password
               <input type="password" id="vaultPasswordInput" autocomplete="off" />
             </label>
-            <button id="vaultUnlockBtn" class="secondary hidden">Unlock</button>
-            <button id="vaultCreateBtn" class="secondary hidden">Create vault</button>
+            <label id="vaultConfirmWrap" class="hidden">
+              Confirm master password
+              <input type="password" id="vaultConfirmInput" autocomplete="off" />
+            </label>
+            <div class="field-btn-wrap">
+              <span class="field-btn-spacer">&nbsp;</span>
+              <button id="vaultUnlockBtn" class="secondary hidden">Unlock</button>
+            </div>
+            <div class="field-btn-wrap">
+              <span class="field-btn-spacer">&nbsp;</span>
+              <button id="vaultCreateBtn" class="secondary hidden">Create vault</button>
+            </div>
           </div>
           <p id="vaultError" class="hint danger-text"></p>
+          <p class="hint">
+            <a href="#" id="forgotPasswordLink" class="hidden">Forgot your master password?</a>
+          </p>
+          <div id="vaultResetConfirm" class="hidden">
+            <p class="hint danger-text">
+              There is no password recovery — the vault key is derived only
+              from your master password, so it can't be recovered. Resetting
+              permanently deletes every saved credential, payment method,
+              address, and proxy password so you can start over.
+            </p>
+            <button id="vaultResetBtn" class="danger small">Reset vault (delete all vault data)</button>
+          </div>
         </div>
         <div id="vaultUnlocked" class="hidden">
           <span class="status">Vault unlocked</span>
           <button id="vaultLockBtn" class="secondary small">Lock now</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Built-in company containers</h2>
+        <p class="hint">
+          One domain per line. Saving replaces the built-in list for that company.
+          Use the reset button to restore defaults.
+        </p>
+        <div id="companies"></div>
+      </section>
+
+      <section>
+        <h2>Custom containers</h2>
+        <p class="hint">
+          Add your own containers — e.g. Work, Banking, Shopping. Give each a
+          name, color, icon, and optional domain list. They behave exactly like
+          the built-in companies and show up in the popup.
+        </p>
+        <div id="customContainers"></div>
+        <button id="addCustomContainer" class="secondary">Add custom container</button>
+        <div class="csv-import">
+          <label class="hint">
+            Import CSV (headers: key, label, color, icon, domains — domains
+            separated by <code>;</code> within the cell)
+            <input type="file" accept=".csv,text/csv" id="importContainersCsv" />
+          </label>
+          <p id="importContainersStatus" class="hint"></p>
         </div>
       </section>
 
@@ -80,6 +130,13 @@
           <tbody></tbody>
         </table>
         <button id="addCredential" class="secondary">Add credential</button>
+        <div class="csv-import">
+          <label class="hint">
+            Import CSV (headers: website, account, password, container)
+            <input type="file" accept=".csv,text/csv" id="importCredentialsCsv" />
+          </label>
+          <p id="importCredentialsStatus" class="hint"></p>
+        </div>
       </section>
 
       <section id="paymentSection" class="hidden">
@@ -90,42 +147,34 @@
           password and this browser profile with the same care as the cards
           themselves.
         </p>
-        <table id="paymentTable">
-          <thead>
-            <tr>
-              <th>Nickname</th>
-              <th>Cardholder</th>
-              <th>Card number</th>
-              <th>CVV</th>
-              <th>Expiry</th>
-              <th>Billing address</th>
-              <th>Container</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+        <div id="paymentList"></div>
         <button id="addPayment" class="secondary">Add payment method</button>
+        <div class="csv-import">
+          <label class="hint">
+            Import CSV (headers: nickname, cardholderName, cardNumber, cvv,
+            expiry, billingAddress, container)
+            <input type="file" accept=".csv,text/csv" id="importPaymentCsv" />
+          </label>
+          <p id="importPaymentStatus" class="hint"></p>
+        </div>
       </section>
 
-      <section>
-        <h2>Built-in company containers</h2>
+      <section id="addressesSection" class="hidden">
+        <h2>Addresses</h2>
         <p class="hint">
-          One domain per line. Saving replaces the built-in list for that company.
-          Use the reset button to restore defaults.
+          A per-container address book — shipping/billing addresses you can
+          assign to a specific container, stored in the encrypted vault.
         </p>
-        <div id="companies"></div>
-      </section>
-
-      <section>
-        <h2>Custom containers</h2>
-        <p class="hint">
-          Add your own containers — e.g. Work, Banking, Shopping. Give each a
-          name, color, icon, and optional domain list. They behave exactly like
-          the built-in companies and show up in the popup.
-        </p>
-        <div id="customContainers"></div>
-        <button id="addCustomContainer" class="secondary">Add custom container</button>
+        <div id="addressesList"></div>
+        <button id="addAddress" class="secondary">Add address</button>
+        <div class="csv-import">
+          <label class="hint">
+            Import CSV (headers: label, recipientName, line1, line2, city,
+            state, postalCode, country, phone, container)
+            <input type="file" accept=".csv,text/csv" id="importAddressesCsv" />
+          </label>
+          <p id="importAddressesStatus" class="hint"></p>
+        </div>
       </section>
 
       <section>

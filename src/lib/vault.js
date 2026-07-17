@@ -1,5 +1,6 @@
 /**
- * Encrypted vault for site credentials, payment methods, and proxy auth.
+ * Encrypted vault for site credentials, payment methods, addresses, and
+ * proxy auth.
  *
  * The vault is a single JSON blob encrypted with AES-256-GCM using a key
  * derived (PBKDF2) from a master password the user chooses. Only the
@@ -26,6 +27,7 @@ function emptyVaultData() {
   return {
     credentials: [],
     paymentMethods: [],
+    addresses: [],
     proxyCredentials: {},
   };
 }
@@ -154,8 +156,10 @@ export async function unlockVault(password) {
     return { ok: false, error: 'invalid-password' };
   }
 
+  // Older vaults may predate fields added later (e.g. addresses) — merge
+  // over defaults so callers never have to null-check a missing array.
   vaultKey = key;
-  vaultData = data;
+  vaultData = { ...emptyVaultData(), ...data };
   ensureIdleListener();
   return { ok: true };
 }
@@ -163,6 +167,19 @@ export async function unlockVault(password) {
 export function lockVault() {
   vaultKey = null;
   vaultData = null;
+}
+
+/**
+ * Permanently delete the vault. There is no password recovery — the key is
+ * derived only from the master password — so this is the only way to
+ * recover from a forgotten one. Wipes every credential, payment method,
+ * address, and proxy password; the caller is expected to have confirmed
+ * with the user first.
+ */
+export async function resetVault() {
+  lockVault();
+  await browser.storage.local.remove(VAULT_KEY);
+  return { ok: true };
 }
 
 /**
@@ -230,6 +247,25 @@ export async function deleteCredential(id) {
   await persist();
 }
 
+export async function importCredentials(entries) {
+  requireUnlocked();
+  const now = Date.now();
+  for (const entry of entries) {
+    vaultData.credentials.push({
+      id: crypto.randomUUID(),
+      website: entry.website || '',
+      account: entry.account || '',
+      password: entry.password || '',
+      containerKey: entry.containerKey || null,
+      notes: entry.notes || '',
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+  await persist();
+  return { imported: entries.length };
+}
+
 // --- Payment methods ------------------------------------------------------
 
 export function listPaymentMethods() {
@@ -264,6 +300,90 @@ export async function deletePaymentMethod(id) {
   requireUnlocked();
   vaultData.paymentMethods = vaultData.paymentMethods.filter((p) => p.id !== id);
   await persist();
+}
+
+export async function importPaymentMethods(entries) {
+  requireUnlocked();
+  const now = Date.now();
+  for (const entry of entries) {
+    vaultData.paymentMethods.push({
+      id: crypto.randomUUID(),
+      nickname: entry.nickname || '',
+      cardholderName: entry.cardholderName || '',
+      cardNumber: entry.cardNumber || '',
+      cvv: entry.cvv || '',
+      expiry: entry.expiry || '',
+      billingAddress: entry.billingAddress || '',
+      containerKey: entry.containerKey || null,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+  await persist();
+  return { imported: entries.length };
+}
+
+// --- Addresses ---------------------------------------------------------
+
+export function listAddresses() {
+  requireUnlocked();
+  return vaultData.addresses.map((a) => ({ ...a }));
+}
+
+export async function saveAddress(entry) {
+  requireUnlocked();
+  const id = entry.id || crypto.randomUUID();
+  const now = Date.now();
+  const idx = vaultData.addresses.findIndex((a) => a.id === id);
+  const record = {
+    id,
+    label: entry.label || '',
+    recipientName: entry.recipientName || '',
+    line1: entry.line1 || '',
+    line2: entry.line2 || '',
+    city: entry.city || '',
+    state: entry.state || '',
+    postalCode: entry.postalCode || '',
+    country: entry.country || '',
+    phone: entry.phone || '',
+    containerKey: entry.containerKey || null,
+    createdAt: idx >= 0 ? vaultData.addresses[idx].createdAt : now,
+    updatedAt: now,
+  };
+  if (idx >= 0) vaultData.addresses[idx] = record;
+  else vaultData.addresses.push(record);
+  await persist();
+  return record;
+}
+
+export async function deleteAddress(id) {
+  requireUnlocked();
+  vaultData.addresses = vaultData.addresses.filter((a) => a.id !== id);
+  await persist();
+}
+
+export async function importAddresses(entries) {
+  requireUnlocked();
+  const now = Date.now();
+  for (const entry of entries) {
+    vaultData.addresses.push({
+      id: crypto.randomUUID(),
+      label: entry.label || '',
+      recipientName: entry.recipientName || '',
+      line1: entry.line1 || '',
+      line2: entry.line2 || '',
+      city: entry.city || '',
+      state: entry.state || '',
+      postalCode: entry.postalCode || '',
+      country: entry.country || '',
+      phone: entry.phone || '',
+      containerKey: entry.containerKey || null,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+  await persist();
+  return { imported: entries.length };
 }
 
 // --- Proxy auth credentials ------------------------------------------------
