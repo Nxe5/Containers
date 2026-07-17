@@ -50,6 +50,7 @@ body {
 }
 
 .page.hidden { display: none; }
+.hidden { display: none !important; }
 
 header {
   display: flex;

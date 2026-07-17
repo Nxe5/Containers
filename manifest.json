@@ -30,6 +30,9 @@
     "tabs",
     "webRequest",
     "webRequestBlocking",
+    "proxy",
+    "nativeMessaging",
+    "idle",
     "<all_urls>"
   ],
   "protocol_handlers": [

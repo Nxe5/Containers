@@ -36,6 +36,20 @@ export const DEFAULT_SETTINGS = Object.freeze({
 
   // hostname -> cookieStoreId. Highest precedence rules.
   userRules: {},
+
+  // Per-container proxy config (non-secret). Key matches a companies/
+  // customContainers key. { type: 'http'|'https'|'socks'|'socks4', host, port }
+  // Proxy auth username/password lives in the encrypted vault, not here.
+  containerProxies: {},
+
+  // Native Messaging bridge settings. The token itself is never stored, only
+  // a hash of it, so it can be verified without being readable from settings.
+  nativeMessaging: {
+    tokenHash: null,
+  },
+
+  // Minutes of inactivity (browser.idle) before the vault auto-locks.
+  vaultAutoLockMinutes: 15,
 });
 
 // URLs where replacing the tab is safe without losing the user's history.

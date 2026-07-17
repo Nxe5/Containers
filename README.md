@@ -106,6 +106,8 @@ src/
     storage.js                # storage.local wrapper
     rules.js                  # Domain matching and precedence
     containers.js             # Container CRUD and temp-container GC
+    vault.js                  # Encrypted credentials/payments/proxy-auth vault
+    native-messaging.js       # connectNative bridge to native-host/
   opener/
     opener.html / opener.js   # ext+container protocol handler target
   popup/
@@ -114,8 +116,12 @@ src/
     options.html / options.js # Settings page
   icons/
     icon.svg
+native-host/
+  index.js                    # Native messaging host (stdio <-> Unix socket)
+  example-client.js           # Reference client for the socket protocol
 scripts/
   open-in-container.sh        # OS launcher
+  install-native-host.sh      # Registers native-host/index.js with Firefox
 plan                          # Original design document
 ```
 
@@ -128,6 +134,81 @@ company containers and show up in the toolbar popup.
 
 For one-off assignments, use the **User overrides** section in Options to force
 a specific hostname into any container, including the default “no container.”
+
+## Per-container proxies
+
+Each built-in or custom container can be routed through its own proxy. In the
+Options page, open a container's card and fill in the **Proxy** section
+(type — HTTP/HTTPS/SOCKS5/SOCKS4 — host, and port). Traffic for tabs in that
+container is routed through the proxy via `browser.proxy.onRequest`; tabs in
+containers without a proxy configured go direct. If the proxy requires
+authentication, set a username/password in the same section — those
+credentials are stored in the encrypted vault (see below), not in plain
+settings, and are supplied automatically via `webRequest.onAuthRequired` when
+the vault is unlocked.
+
+## Vault: site credentials and payment methods
+
+The Options page has **Site credentials** and **Payment methods** sections,
+each a simple table (website/account/password/container, and
+nickname/cardholder/card number/CVV/expiry/billing address/container
+respectively). Entries are tied to a container and stored in an **encrypted
+vault**, not in plain `browser.storage.local`:
+
+- The vault is protected by a master password you choose the first time you
+  open the **Vault** section. That password is never stored anywhere — it's
+  used once to derive an AES-256-GCM key (via PBKDF2, 210k iterations) that
+  encrypts the vault contents at rest.
+- The decrypted vault only lives in the background page's memory for the
+  current session. It locks automatically after 15 minutes of inactivity
+  (`browser.idle`), and locking/reloading the browser clears it — you'll need
+  to re-enter the master password to unlock it again.
+- In the popup, if the current site has a saved credential and the vault is
+  unlocked, a **Fill login** button appears and fills the page's username/
+  password fields on click (no auto-submit, and nothing is filled
+  automatically on page load).
+
+**A note on payment data**: this vault stores full card numbers and CVVs if
+you choose to enter them, at your own request. That is a materially larger
+security surface than a browser normally takes on — this is not a
+PCI-compliant system, there's no tokenization, and a bug or a compromised
+update could expose real card data. Treat your master password, this browser
+profile, and any backups of it with the same care you'd give the physical
+cards.
+
+## Native messaging bridge (external automation)
+
+An external script — e.g. a Playwright automation — can read stored
+credentials through a local Native Messaging host, without ever seeing your
+master password:
+
+1. Run `scripts/install-native-host.sh` once. It registers
+   `native-host/index.js` as a Firefox native messaging host
+   (`com_companycontainers_host`) and makes it executable.
+2. Reload the extension, then open Options → **Native messaging bridge** and
+   click **Regenerate token**. Copy the token shown (it's only displayed
+   once; only its hash is stored).
+3. From your external script, connect to the Unix socket at
+   `~/.company-containers/host.sock` and send a newline-delimited JSON
+   request:
+   ```json
+   {"id": "1", "type": "get-credential", "token": "<your token>", "website": "github.com"}
+   ```
+   You'll get back `{"id": "1", "ok": true, "result": [...]}` with any
+   matching credentials, or `{"ok": false, "error": "vault-locked"}` if the
+   vault hasn't been unlocked in the browser yet. `native-host/example-client.js`
+   is a minimal reference implementation of this protocol:
+   ```bash
+   node native-host/example-client.js github.com <token>
+   ```
+
+How it fits together: `native-host/index.js` is spawned by Firefox when the
+extension opens a `connectNative()` port at boot, and separately listens on
+the Unix socket (mode `0600`, owner-only) for your script. It relays socket
+requests to the extension over the native-messaging stdio channel and relays
+the extension's response back — it never has its own copy of the vault key or
+the master password, only whatever the extension chooses to hand back for a
+given request.
 
 ## Updating domain lists
 

@@ -1,5 +1,10 @@
 import { loadSettings, saveSettings, loadState, saveState } from '../lib/storage.js';
-import { resolveTarget, getEffectiveDomainList } from '../lib/rules.js';
+import {
+  resolveTarget,
+  getEffectiveDomainList,
+  getContainerKeyByCookieStoreId,
+  getContainerProxy,
+} from '../lib/rules.js';
 import {
   ensureContainers,
   ensureContainerForName,
@@ -9,6 +14,8 @@ import {
   getAllContainers,
 } from '../lib/containers.js';
 import { FRESH_TAB_URLS } from '../lib/defaults.js';
+import * as vault from '../lib/vault.js';
+import { initNativeMessaging } from '../lib/native-messaging.js';
 
 let bundledDomainData = null;
 let domainData = null;
@@ -59,6 +66,8 @@ async function boot(reason = '') {
     }
 
     await gcTemporaryContainers();
+    vault.configureAutoLock(settings.vaultAutoLockMinutes);
+    initNativeMessaging();
     booted = true;
     console.log('[Company Containers] booted', reason, settings, state);
   } catch (err) {
@@ -189,6 +198,48 @@ async function reopenTab(tabId, cookieStoreId, reason = 'manual', replace = null
   });
 
   return { ok: true };
+}
+
+async function vaultOp(fn) {
+  try {
+    const result = await fn();
+    return { ok: true, result };
+  } catch (err) {
+    return { ok: false, error: err.message === 'vault-locked' ? 'vault-locked' : err.message };
+  }
+}
+
+function handleProxyRequest(details) {
+  if (!booted) return [{ type: 'direct' }];
+  const containerKey = getContainerKeyByCookieStoreId(details.cookieStoreId, settings);
+  const proxy = containerKey ? getContainerProxy(containerKey, settings) : null;
+  if (!proxy) return [{ type: 'direct' }];
+  return [{ type: proxy.type, host: proxy.host, port: Number(proxy.port) }];
+}
+
+async function handleProxyAuth(details) {
+  if (!booted || !details.isProxy || !vault.isUnlocked()) return {};
+
+  let containerKey = null;
+  if (details.tabId >= 0) {
+    try {
+      const tab = await browser.tabs.get(details.tabId);
+      containerKey = getContainerKeyByCookieStoreId(tab.cookieStoreId, settings);
+    } catch {
+      return {};
+    }
+  }
+  if (!containerKey) return {};
+
+  let creds;
+  try {
+    creds = vault.getProxyCredential(containerKey);
+  } catch {
+    return {};
+  }
+  if (!creds) return {};
+
+  return { authCredentials: { username: creds.username, password: creds.password } };
 }
 
 function scheduleGc() {
@@ -369,6 +420,96 @@ async function handleMessage(message, sender, sendResponse) {
       return { domainData };
     }
 
+    // --- Vault lifecycle ---------------------------------------------
+
+    case 'vault-status':
+      return vault.vaultStatus();
+
+    case 'vault-create':
+      return vault.createVault(message.password);
+
+    case 'vault-unlock':
+      return vault.unlockVault(message.password);
+
+    case 'vault-lock':
+      vault.lockVault();
+      return { ok: true };
+
+    // --- Site credentials ---------------------------------------------
+
+    case 'vault-list-credentials':
+      return vaultOp(() => vault.listCredentials());
+
+    case 'vault-find-credentials-for-hostname':
+      return vaultOp(() => vault.findCredentialsForHostname(message.hostname));
+
+    case 'vault-save-credential':
+      return vaultOp(() => vault.saveCredential(message.entry));
+
+    case 'vault-delete-credential':
+      return vaultOp(() => vault.deleteCredential(message.id));
+
+    // --- Payment methods ------------------------------------------------
+
+    case 'vault-list-payment-methods':
+      return vaultOp(() => vault.listPaymentMethods());
+
+    case 'vault-save-payment-method':
+      return vaultOp(() => vault.savePaymentMethod(message.entry));
+
+    case 'vault-delete-payment-method':
+      return vaultOp(() => vault.deletePaymentMethod(message.id));
+
+    // --- Proxy auth credentials (vault) + proxy config (plain settings) --
+
+    case 'vault-get-proxy-credential':
+      return vaultOp(() => vault.getProxyCredential(message.containerKey));
+
+    case 'vault-set-proxy-credential':
+      return vaultOp(() =>
+        vault.setProxyCredential(message.containerKey, {
+          username: message.username,
+          password: message.password,
+        })
+      );
+
+    case 'vault-delete-proxy-credential':
+      return vaultOp(() => vault.deleteProxyCredential(message.containerKey));
+
+    case 'set-container-proxy': {
+      settings.containerProxies = {
+        ...(settings.containerProxies || {}),
+        [message.key]: {
+          type: message.proxyType,
+          host: message.host,
+          port: message.port,
+        },
+      };
+      await saveSettings(settings);
+      return { settings };
+    }
+
+    case 'delete-container-proxy': {
+      const proxies = { ...(settings.containerProxies || {}) };
+      delete proxies[message.key];
+      settings.containerProxies = proxies;
+      await saveSettings(settings);
+      return { settings };
+    }
+
+    // --- Native messaging bridge token -----------------------------------
+
+    case 'native-token-status':
+      return { hasToken: !!settings.nativeMessaging?.tokenHash };
+
+    case 'native-token-regenerate': {
+      const token = vault.generateApiToken();
+      const tokenHash = await vault.hashToken(token);
+      settings.nativeMessaging = { tokenHash };
+      await saveSettings(settings);
+      return { ok: true, token };
+    }
+
     default:
       return { error: `unknown message type: ${message.type}` };
   }
@@ -385,6 +526,14 @@ async function init() {
   browser.webRequest.onBeforeRequest.addListener(
     handleBeforeRequest,
     { urls: ['<all_urls>'], types: ['main_frame'] },
+    ['blocking']
+  );
+
+  browser.proxy.onRequest.addListener(handleProxyRequest, { urls: ['<all_urls>'] });
+
+  browser.webRequest.onAuthRequired.addListener(
+    handleProxyAuth,
+    { urls: ['<all_urls>'] },
     ['blocking']
   );
 

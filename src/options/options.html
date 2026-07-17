@@ -37,6 +37,77 @@
         </div>
       </section>
 
+      <section id="vaultSection">
+        <h2>Vault</h2>
+        <p class="hint">
+          Site credentials, payment methods, and proxy passwords are stored in
+          an encrypted vault protected by a master password you choose here.
+          The master password is never stored and never leaves the browser.
+        </p>
+        <div id="vaultLocked">
+          <div class="grid three">
+            <label>
+              Master password
+              <input type="password" id="vaultPasswordInput" autocomplete="off" />
+            </label>
+            <button id="vaultUnlockBtn" class="secondary hidden">Unlock</button>
+            <button id="vaultCreateBtn" class="secondary hidden">Create vault</button>
+          </div>
+          <p id="vaultError" class="hint danger-text"></p>
+        </div>
+        <div id="vaultUnlocked" class="hidden">
+          <span class="status">Vault unlocked</span>
+          <button id="vaultLockBtn" class="secondary small">Lock now</button>
+        </div>
+      </section>
+
+      <section id="credentialsSection" class="hidden">
+        <h2>Site credentials</h2>
+        <p class="hint">
+          Used by the popup's "Fill login" action and by the native-messaging
+          bridge below, whenever the vault is unlocked.
+        </p>
+        <table id="credentialsTable">
+          <thead>
+            <tr>
+              <th>Website</th>
+              <th>Account</th>
+              <th>Password</th>
+              <th>Container</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <button id="addCredential" class="secondary">Add credential</button>
+      </section>
+
+      <section id="paymentSection" class="hidden">
+        <h2>Payment methods</h2>
+        <p class="hint danger-text">
+          Full card numbers and CVVs are stored in the encrypted vault at your
+          request. This is not a PCI-compliant system — treat your master
+          password and this browser profile with the same care as the cards
+          themselves.
+        </p>
+        <table id="paymentTable">
+          <thead>
+            <tr>
+              <th>Nickname</th>
+              <th>Cardholder</th>
+              <th>Card number</th>
+              <th>CVV</th>
+              <th>Expiry</th>
+              <th>Billing address</th>
+              <th>Container</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <button id="addPayment" class="secondary">Add payment method</button>
+      </section>
+
       <section>
         <h2>Built-in company containers</h2>
         <p class="hint">
@@ -71,6 +142,21 @@
           <tbody></tbody>
         </table>
         <button id="addUserRule" class="secondary">Add override</button>
+      </section>
+
+      <section id="nativeMessagingSection">
+        <h2>Native messaging bridge</h2>
+        <p class="hint">
+          Lets a local script (e.g. a Playwright automation) request stored
+          credentials through <code>native-host/index.js</code>. Run
+          <code>scripts/install-native-host.sh</code> once to register it with
+          Firefox, then generate a token below — requests only succeed while
+          the vault above is unlocked, and the master password itself is
+          never sent over this bridge. See the README for the full protocol.
+        </p>
+        <button id="regenerateToken" class="secondary">Regenerate token</button>
+        <span id="tokenStatus" class="status"></span>
+        <p id="tokenDisplay" class="hint hidden"></p>
       </section>
 
       <section>

@@ -64,6 +64,32 @@ export function isCompanyEnabled(companyKey, settings) {
 }
 
 /**
+ * Reverse lookup: given a cookieStoreId, find the company/custom container
+ * key it belongs to. Used by proxy routing and the native-messaging bridge,
+ * both of which only have a cookieStoreId (from a tab) to start from.
+ */
+export function getContainerKeyByCookieStoreId(cookieStoreId, settings) {
+  if (!cookieStoreId) return null;
+  for (const [key, cfg] of Object.entries(settings?.companies || {})) {
+    if (cfg?.cookieStoreId === cookieStoreId) return key;
+  }
+  for (const [key, cfg] of Object.entries(settings?.customContainers || {})) {
+    if (cfg?.cookieStoreId === cookieStoreId) return key;
+  }
+  return null;
+}
+
+/**
+ * Non-secret proxy config for a container key, or null. Auth credentials (if
+ * any) live in the encrypted vault, keyed by the same container key.
+ */
+export function getContainerProxy(containerKey, settings) {
+  const proxy = settings?.containerProxies?.[containerKey];
+  if (!proxy || !proxy.host || !proxy.port) return null;
+  return proxy;
+}
+
+/**
  * Resolve which container a hostname belongs in.
  *
  * Precedence:

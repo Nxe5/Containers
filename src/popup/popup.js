@@ -2,6 +2,37 @@ let currentStatus = null;
 let currentTabId = null;
 let currentHostname = null;
 let currentAction = null;
+let vaultState = { exists: false, unlocked: false };
+let currentCredentialMatches = [];
+
+function fillCredentialCode(account, password) {
+  return `(() => {
+    const account = ${JSON.stringify(account)};
+    const password = ${JSON.stringify(password)};
+
+    const setValue = (el, value) => {
+      if (!el) return;
+      const proto = Object.getPrototypeOf(el);
+      const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+      if (setter) setter.call(el, value);
+      else el.value = value;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+
+    const passwordField = document.querySelector('input[type="password"]');
+    const scope = (passwordField && passwordField.form) || document;
+    let usernameField = scope.querySelector(
+      'input[type="email"], input[autocomplete="username"], input[name*="user" i], input[name*="email" i], input[id*="user" i], input[id*="email" i]'
+    );
+    if (!usernameField) {
+      usernameField = scope.querySelector('input[type="text"], input:not([type])');
+    }
+
+    if (usernameField && account) setValue(usernameField, account);
+    if (passwordField && password) setValue(passwordField, password);
+  })();`;
+}
 
 const BUILTIN_ORDER = ['google', 'microsoft', 'meta'];
 
@@ -26,6 +57,17 @@ async function loadStatus() {
     }
   } else {
     currentHostname = null;
+  }
+
+  vaultState = await browser.runtime.sendMessage({ type: 'vault-status' });
+  if (currentHostname && vaultState.unlocked) {
+    const result = await browser.runtime.sendMessage({
+      type: 'vault-find-credentials-for-hostname',
+      hostname: currentHostname,
+    });
+    currentCredentialMatches = result.ok ? result.result : [];
+  } else {
+    currentCredentialMatches = [];
   }
 
   return { status, tab };
@@ -206,6 +248,23 @@ function renderHome() {
     alwaysBtn.disabled = true;
   }
 
+  // Fill login button.
+  const fillBtn = document.getElementById('fillLoginBtn');
+  if (currentCredentialMatches.length > 0) {
+    fillBtn.classList.remove('hidden');
+    fillBtn.disabled = false;
+    fillBtn.textContent =
+      currentCredentialMatches.length === 1
+        ? `Fill login (${currentCredentialMatches[0].account || 'saved'})`
+        : `Fill login (${currentCredentialMatches.length} saved)`;
+  } else if (currentHostname && vaultState.exists && !vaultState.unlocked) {
+    fillBtn.classList.remove('hidden');
+    fillBtn.disabled = true;
+    fillBtn.textContent = 'Unlock vault in Options to fill';
+  } else {
+    fillBtn.classList.add('hidden');
+  }
+
   // Toggles.
   document.getElementById('isolateToggle').checked = status.settings.isolateUnmatched !== false;
   document.getElementById('replaceToggle').checked = status.settings.replaceTabInsteadOfNew === true;
@@ -259,6 +318,20 @@ async function init() {
       value: e.target.checked,
     });
     await loadStatus();
+  });
+
+  // Fill login button.
+  document.getElementById('fillLoginBtn').addEventListener('click', async () => {
+    if (currentCredentialMatches.length === 0 || !currentTabId) return;
+    const cred = currentCredentialMatches[0];
+    try {
+      await browser.tabs.executeScript(currentTabId, {
+        code: fillCredentialCode(cred.account, cred.password),
+      });
+    } catch (err) {
+      console.error('[Company Containers] fill login failed', err);
+    }
+    window.close();
   });
 
   // Options link.
