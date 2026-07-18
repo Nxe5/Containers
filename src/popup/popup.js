@@ -73,14 +73,6 @@ async function loadStatus() {
   return { status, tab };
 }
 
-function escapeHtml(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
 function getContainerConfig(key) {
   return currentStatus.settings.companies[key] || currentStatus.settings.customContainers[key];
 }
@@ -143,16 +135,27 @@ function buildItem({ label, color, cookieStoreId, subtitle = '', key = '' }) {
   item.dataset.cookieStoreId = cookieStoreId;
   if (key) item.dataset.key = key;
 
-  const dotColor = color === 'toolbar' ? '#8f8f8f' : (color === 'transparent' ? 'transparent' : color);
-  const dotStyle = color === 'transparent'
-    ? 'background:transparent;border:1px solid var(--border)'
-    : `background:${dotColor}`;
+  const dot = document.createElement('span');
+  dot.className = 'dot';
+  if (color === 'transparent') {
+    dot.style.background = 'transparent';
+    dot.style.border = '1px solid var(--border)';
+  } else {
+    dot.style.background = color === 'toolbar' ? '#8f8f8f' : color;
+  }
+  item.appendChild(dot);
 
-  item.innerHTML = `
-    <span class="dot" style="${dotStyle}"></span>
-    <span class="name">${escapeHtml(label)}</span>
-    ${subtitle ? `<span class="subtitle">${escapeHtml(subtitle)}</span>` : ''}
-  `;
+  const name = document.createElement('span');
+  name.className = 'name';
+  name.textContent = label;
+  item.appendChild(name);
+
+  if (subtitle) {
+    const sub = document.createElement('span');
+    sub.className = 'subtitle';
+    sub.textContent = subtitle;
+    item.appendChild(sub);
+  }
 
   item.addEventListener('click', () => onContainerClick(cookieStoreId, label));
   return item;

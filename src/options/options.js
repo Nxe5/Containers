@@ -303,24 +303,54 @@ function renderBuiltinCompanies() {
 
     const card = document.createElement('div');
     card.className = 'company-card';
-    card.innerHTML = `
-      <div class="company-header">
-        <span class="company-title">
-          <span class="dot" style="background:${meta.color === 'toolbar' ? '#8f8f8f' : meta.color}"></span>
-          ${escapeHtml(meta.label)}
-          <label class="toggle" style="margin-left:8px">
-            <input type="checkbox" data-key="${key}" ${cfg.enabled ? 'checked' : ''} />
-            <span>Enabled</span>
-          </label>
-        </span>
-        <span class="company-actions">
-          <button class="secondary small save-domains" data-key="${key}">Save domains</button>
-          <button class="secondary small reset-domains" data-key="${key}">Reset</button>
-        </span>
-      </div>
-      <p class="hint">Container: ${containerInfo ? escapeHtml(containerInfo.name) : 'not created yet'}</p>
-      <textarea data-key="${key}">${effective.join('\n')}</textarea>
-    `;
+
+    const header = document.createElement('div');
+    header.className = 'company-header';
+
+    const title = document.createElement('span');
+    title.className = 'company-title';
+
+    const dot = document.createElement('span');
+    dot.className = 'dot';
+    dot.style.background = meta.color === 'toolbar' ? '#8f8f8f' : meta.color;
+    title.appendChild(dot);
+    title.appendChild(document.createTextNode(meta.label));
+
+    const enabledLabel = document.createElement('label');
+    enabledLabel.className = 'toggle';
+    enabledLabel.style.marginLeft = '8px';
+    const enabledCheckbox = document.createElement('input');
+    enabledCheckbox.type = 'checkbox';
+    enabledCheckbox.dataset.key = key;
+    enabledCheckbox.checked = !!cfg.enabled;
+    const enabledSpan = document.createElement('span');
+    enabledSpan.textContent = 'Enabled';
+    enabledLabel.append(enabledCheckbox, enabledSpan);
+    title.appendChild(enabledLabel);
+
+    const actions = document.createElement('span');
+    actions.className = 'company-actions';
+    const saveDomainsBtn = document.createElement('button');
+    saveDomainsBtn.className = 'secondary small save-domains';
+    saveDomainsBtn.dataset.key = key;
+    saveDomainsBtn.textContent = 'Save domains';
+    const resetDomainsBtn = document.createElement('button');
+    resetDomainsBtn.className = 'secondary small reset-domains';
+    resetDomainsBtn.dataset.key = key;
+    resetDomainsBtn.textContent = 'Reset';
+    actions.append(saveDomainsBtn, resetDomainsBtn);
+
+    header.append(title, actions);
+
+    const containerHint = document.createElement('p');
+    containerHint.className = 'hint';
+    containerHint.textContent = `Container: ${containerInfo ? containerInfo.name : 'not created yet'}`;
+
+    const textarea = document.createElement('textarea');
+    textarea.dataset.key = key;
+    textarea.value = effective.join('\n');
+
+    card.append(header, containerHint, textarea);
     card.appendChild(buildProxyBlock(key, currentStatus.settings.containerProxies?.[key]));
     container.appendChild(card);
   }
@@ -381,52 +411,85 @@ function buildCustomContainerCard(key, cfg) {
   card.className = 'company-card custom-card';
   card.dataset.key = key;
 
-  const colorSelectId = `cc-color-${key}`;
-  const iconSelectId = `cc-icon-${key}`;
+  const header = document.createElement('div');
+  header.className = 'company-header';
 
-  card.innerHTML = `
-    <div class="company-header">
-      <span class="company-title">
-        <span class="dot" style="background:${cfg.color === 'toolbar' ? '#8f8f8f' : cfg.color}"></span>
-        <input type="text" class="inline-name" value="${escapeHtml(cfg.label)}" placeholder="Container name" />
-      </span>
-      <span class="company-actions">
-        <label class="toggle" style="margin-right:8px">
-          <input type="checkbox" class="enabled-toggle" ${cfg.enabled !== false ? 'checked' : ''} />
-          <span>Enabled</span>
-        </label>
-        <button class="secondary small save-custom">Save</button>
-        <button class="danger small delete-custom">Delete</button>
-      </span>
-    </div>
-    <div class="grid three">
-      <label>
-        Color
-        <select class="color-select" id="${colorSelectId}"></select>
-      </label>
-      <label>
-        Icon
-        <select class="icon-select" id="${iconSelectId}"></select>
-      </label>
-      <label>
-        Key
-        <input type="text" class="key-display" value="${escapeHtml(key)}" readonly />
-      </label>
-    </div>
-    <label style="margin-top:8px">Domains (one per line)</label>
-    <textarea class="domains-textarea">${(cfg.domains || []).join('\n')}</textarea>
-  `;
+  const title = document.createElement('span');
+  title.className = 'company-title';
+  const dot = document.createElement('span');
+  dot.className = 'dot';
+  dot.style.background = cfg.color === 'toolbar' ? '#8f8f8f' : cfg.color;
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.className = 'inline-name';
+  nameInput.value = cfg.label;
+  nameInput.placeholder = 'Container name';
+  title.append(dot, nameInput);
 
-  populateSelect(card.querySelector('.color-select'), COLORS, cfg.color || 'toolbar');
-  populateSelect(card.querySelector('.icon-select'), ICONS, cfg.icon || 'circle');
+  const actions = document.createElement('span');
+  actions.className = 'company-actions';
+
+  const enabledLabel = document.createElement('label');
+  enabledLabel.className = 'toggle';
+  enabledLabel.style.marginRight = '8px';
+  const enabledCheckbox = document.createElement('input');
+  enabledCheckbox.type = 'checkbox';
+  enabledCheckbox.className = 'enabled-toggle';
+  enabledCheckbox.checked = cfg.enabled !== false;
+  const enabledSpan = document.createElement('span');
+  enabledSpan.textContent = 'Enabled';
+  enabledLabel.append(enabledCheckbox, enabledSpan);
+
+  const saveBtn = document.createElement('button');
+  saveBtn.className = 'secondary small save-custom';
+  saveBtn.textContent = 'Save';
+  const deleteBtn = document.createElement('button');
+  deleteBtn.className = 'danger small delete-custom';
+  deleteBtn.textContent = 'Delete';
+
+  actions.append(enabledLabel, saveBtn, deleteBtn);
+  header.append(title, actions);
+
+  const fieldsGrid = document.createElement('div');
+  fieldsGrid.className = 'grid three';
+
+  const colorSelect = document.createElement('select');
+  colorSelect.className = 'color-select';
+  colorSelect.id = `cc-color-${key}`;
+  fieldsGrid.appendChild(wrapLabel('Color', colorSelect));
+
+  const iconSelect = document.createElement('select');
+  iconSelect.className = 'icon-select';
+  iconSelect.id = `cc-icon-${key}`;
+  fieldsGrid.appendChild(wrapLabel('Icon', iconSelect));
+
+  const keyInput = document.createElement('input');
+  keyInput.type = 'text';
+  keyInput.className = 'key-display';
+  keyInput.value = key;
+  keyInput.readOnly = true;
+  fieldsGrid.appendChild(wrapLabel('Key', keyInput));
+
+  const domainsLabel = document.createElement('label');
+  domainsLabel.style.marginTop = '8px';
+  domainsLabel.textContent = 'Domains (one per line)';
+
+  const domainsTextarea = document.createElement('textarea');
+  domainsTextarea.className = 'domains-textarea';
+  domainsTextarea.value = (cfg.domains || []).join('\n');
+
+  card.append(header, fieldsGrid, domainsLabel, domainsTextarea);
+
+  populateSelect(colorSelect, COLORS, cfg.color || 'toolbar');
+  populateSelect(iconSelect, ICONS, cfg.icon || 'circle');
 
   card.appendChild(buildProxyBlock(key, currentStatus.settings.containerProxies?.[key]));
 
-  card.querySelector('.save-custom').addEventListener('click', async () => {
+  saveBtn.addEventListener('click', async () => {
     await saveCustomContainer(card, key);
   });
 
-  card.querySelector('.delete-custom').addEventListener('click', async () => {
+  deleteBtn.addEventListener('click', async () => {
     if (!confirm(`Delete container "${cfg.label}"?`)) return;
     await browser.runtime.sendMessage({ type: 'delete-custom-container', key });
     await loadStatus();
@@ -845,14 +908,6 @@ async function saveGlobals() {
   await loadStatus();
 }
 
-function escapeHtml(str) {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
 async function init() {
   await loadStatus();
   renderGlobals();
@@ -1094,5 +1149,8 @@ async function init() {
 
 init().catch((err) => {
   console.error('[Company Containers options]', err);
-  document.body.insertAdjacentHTML('afterbegin', `<p class="hint" style="color:#d70022">Error loading options: ${escapeHtml(err.message)}</p>`);
+  const notice = document.createElement('p');
+  notice.className = 'hint danger-text';
+  notice.textContent = `Error loading options: ${err.message}`;
+  document.body.prepend(notice);
 });

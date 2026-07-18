@@ -1,2 +1,4 @@
 .sidebar/
 *.zip
+node_modules/
+web-ext-artifacts/

@@ -49,6 +49,25 @@ three company containers.
 > [addons.mozilla.org](https://addons.mozilla.org) or use a Firefox policy
 > (`ExtensionSettings`) for enterprise installs.
 
+## Packaging for addons.mozilla.org
+
+The extension itself has no build step — it's plain ES modules loaded
+directly per `manifest.json`. `pnpm` here only manages
+[`web-ext`](https://github.com/mozilla/web-ext), Mozilla's own packaging/lint
+CLI, which is what actually validates the manifest and builds the upload:
+
+```bash
+pnpm install        # one-time, installs web-ext
+pnpm run lint        # validates manifest.json and scans for common review flags
+pnpm run build        # writes web-ext-artifacts/company_containers-<version>.zip
+pnpm run start        # launches Firefox with the extension loaded, for quick manual testing
+```
+
+`web-ext-config.cjs` excludes everything that isn't part of the extension
+bundle — `native-host/`, `scripts/`, `plan`, this README, and the tooling
+files themselves — so the zip `web-ext build` produces contains only
+`manifest.json` and `src/`, ready to upload as-is.
+
 ## Usage
 
 - **Normal browsing**: navigate anywhere. The extension quietly moves tabs into

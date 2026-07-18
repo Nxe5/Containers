@@ -1,0 +1,14 @@
+{
+  "name": "company-containers",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Firefox extension that auto-isolates Google, Microsoft, and Meta browsing into containers, with everything else falling back to Temporary Containers.",
+  "scripts": {
+    "lint": "web-ext lint",
+    "build": "web-ext build --overwrite-dest",
+    "start": "web-ext run"
+  },
+  "devDependencies": {
+    "web-ext": "^10.5.0"
+  }
+}
