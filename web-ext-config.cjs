@@ -12,7 +12,7 @@ module.exports = {
   //     manifest.json anyway.
   //   - scripts/ are OS-level launcher/install helpers, not loaded by the
   //     extension.
-  //   - plan, README.md, and stray zips are project docs/artifacts.
+  //   - plan, README.md, PRIVACY.md, docs/, and stray zips are project docs/artifacts.
   //   - package.json/pnpm-lock.yaml/web-ext-config.cjs are this tooling
   //     itself, not part of the extension bundle.
   ignoreFiles: [
@@ -22,6 +22,9 @@ module.exports = {
     'scripts/**',
     'plan',
     'README.md',
+    'PRIVACY.md',
+    'docs',
+    'docs/**',
     '*.zip',
     'web-ext-artifacts',
     'web-ext-artifacts/**',
