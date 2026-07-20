@@ -2,9 +2,16 @@
  * Default extension state and settings.
  */
 
-export const EXTENSION_ID = 'company-containers@example.com';
+export const EXTENSION_ID = '{d2e31876-bc5b-4d3c-b649-4b1faec96a87}';
 
 export const DEFAULT_SETTINGS = Object.freeze({
+  // Master kill switch. When false, the background engine stops
+  // auto-redirecting tabs into containers and stops routing/authenticating
+  // container proxies, without touching any other stored settings. Manual
+  // popup actions and the options page keep working so it can be turned
+  // back on.
+  extensionEnabled: true,
+
   // Send any navigation that doesn't match a company/user rule into a
   // brand-new Temporary Container instead of the current container.
   isolateUnmatched: true,
@@ -21,9 +28,10 @@ export const DEFAULT_SETTINGS = Object.freeze({
   // Per-company toggles and the cookieStoreId of the container we created.
   // cookieStoreId is persisted after first run.
   companies: {
-    google:    { enabled: true, cookieStoreId: null },
-    microsoft: { enabled: true, cookieStoreId: null },
-    meta:      { enabled: true, cookieStoreId: null },
+    youtube: { enabled: true, cookieStoreId: null },
+    gmail:   { enabled: true, cookieStoreId: null },
+    github:  { enabled: true, cookieStoreId: null },
+    amazon:  { enabled: true, cookieStoreId: null },
   },
 
   // Optional full domain overrides. If a key exists here it replaces the

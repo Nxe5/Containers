@@ -13,6 +13,11 @@
           <span>Company Containers</span>
         </header>
 
+        <button id="extensionToggleBtn" class="ext-toggle-btn"></button>
+        <p id="extensionToggleHint" class="hint ext-toggle-hint hidden">
+          Auto-isolation and container proxies are paused. Manual actions below still work.
+        </p>
+
         <section class="actions">
           <button class="primary action-btn" data-action="new">Open new tab in…</button>
           <button class="primary action-btn" data-action="reopen">Reopen this site in…</button>
@@ -51,6 +56,21 @@
         </header>
         <input type="search" id="selectSearch" placeholder="Search containers…" />
         <div id="selectContainers" class="container-list"></div>
+      </div>
+
+      <!-- Disable confirmation overlay -->
+      <div id="disableConfirmOverlay" class="modal-overlay hidden">
+        <div class="modal">
+          <p>Disable Company Containers?</p>
+          <p class="hint">
+            Auto-isolation and container proxies will stop working until you
+            turn it back on. This popup will still work.
+          </p>
+          <div class="modal-actions">
+            <button id="disableConfirmCancel" class="secondary">Cancel</button>
+            <button id="disableConfirmOk" class="danger">Disable</button>
+          </div>
+        </div>
       </div>
     </div>
 

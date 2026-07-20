@@ -2,8 +2,8 @@
   "manifest_version": 2,
   "name": "Company Containers",
   "version": "1.0.0",
-  "description": "Auto-isolate Google, Microsoft, and Meta browsing in containers; unmatched sites open in temporary containers.",
-  "homepage_url": "https://github.com/honsiorovskyi/open-url-in-container",
+  "description": "Auto-isolate YouTube, Gmail, GitHub, and Amazon in their own containers; unmatched sites open in temporary containers.",
+  "homepage_url": "https://github.com/Nxe5/Containers",
   "icons": {
     "48": "src/icons/icon.svg",
     "96": "src/icons/icon.svg"
@@ -30,10 +30,12 @@
     "tabs",
     "webRequest",
     "webRequestBlocking",
-    "proxy",
-    "nativeMessaging",
     "idle",
     "<all_urls>"
+  ],
+  "optional_permissions": [
+    "proxy",
+    "nativeMessaging"
   ],
   "protocol_handlers": [
     {
@@ -44,8 +46,8 @@
   ],
   "browser_specific_settings": {
     "gecko": {
-      "id": "company-containers@example.com",
-      "strict_min_version": "91.1.0",
+      "id": "{d2e31876-bc5b-4d3c-b649-4b1faec96a87}",
+      "strict_min_version": "142.0",
       "data_collection_permissions": {
         "required": ["none"]
       }

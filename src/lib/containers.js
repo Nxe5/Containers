@@ -68,12 +68,17 @@ export async function ensureContainers(settings, domainData) {
     const { color, icon } = sanitizeContainerParams(meta);
 
     if (!found) {
-      found = await browser.contextualIdentities.create({
-        name: label,
-        color,
-        icon,
-      });
-      changed = true;
+      try {
+        found = await browser.contextualIdentities.create({
+          name: label,
+          color,
+          icon,
+        });
+        changed = true;
+      } catch (err) {
+        console.warn('[Company Containers] failed to create container', key, err);
+        continue;
+      }
     } else if (
       found.name !== label ||
       found.color !== color ||

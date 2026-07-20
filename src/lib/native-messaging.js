@@ -21,6 +21,7 @@ const RECONNECT_DELAY_MS = 60000;
 let port = null;
 let reconnectTimeout = null;
 let hasWarned = false;
+let torndown = false;
 
 async function dispatch(type, message) {
   switch (type) {
@@ -94,12 +95,34 @@ function connect() {
       hasWarned = true;
     }
     port = null;
-    scheduleReconnect();
+    if (!torndown) scheduleReconnect();
   });
 
   hasWarned = false;
 }
 
 export function initNativeMessaging() {
+  torndown = false;
   connect();
+}
+
+/**
+ * Stop talking to the native host and cancel any pending reconnect. Used
+ * when the "nativeMessaging" optional permission is revoked at runtime, so
+ * we don't keep retrying connectNative() without the permission to back it.
+ */
+export function stopNativeMessaging() {
+  torndown = true;
+  if (reconnectTimeout) {
+    clearTimeout(reconnectTimeout);
+    reconnectTimeout = null;
+  }
+  if (port) {
+    try {
+      port.disconnect();
+    } catch {
+      // already gone
+    }
+    port = null;
+  }
 }

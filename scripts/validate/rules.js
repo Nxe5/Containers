@@ -39,4 +39,4 @@ assert(r3.cookieStoreId === null && r3.reason === 'no-match', 'stay in temp');
 const r4 = resolveTarget({ hostname: 'work.example.com', currentCookieStoreId: 'firefox-default', domainData, settings, state });
 assert(r4.cookieStoreId === 'firefox-container-30' && r4.reason === 'user-rule', 'resolve user');
 
-print('All rule tests passed');
+console.log('All rule tests passed');

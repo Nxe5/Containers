@@ -7,7 +7,7 @@ const ICONS = [
   'vacation', 'food', 'fruit', 'pet', 'tree', 'chill', 'fence',
 ];
 
-const BUILTIN_KEYS = new Set(['google', 'microsoft', 'meta']);
+const BUILTIN_KEYS = new Set(['youtube', 'gmail', 'github', 'amazon']);
 
 let currentStatus = null;
 
@@ -254,6 +254,14 @@ function buildProxyBlock(key, proxyConfig) {
     if (!typeSelect.value || !hostInput.value.trim() || !portInput.value.trim()) {
       await browser.runtime.sendMessage({ type: 'delete-container-proxy', key });
     } else {
+      // "proxy" is an optional permission — request it (with this click as
+      // the user gesture) the first time a container actually gets a proxy
+      // configured, rather than asking for it at install time.
+      const granted = await browser.permissions.request({ permissions: ['proxy'] });
+      if (!granted) {
+        alert('Proxy routing needs the "Proxy" permission, which was not granted.');
+        return;
+      }
       await browser.runtime.sendMessage({
         type: 'set-container-proxy',
         key,
@@ -1112,6 +1120,14 @@ async function init() {
         'Regenerate the native-messaging API token? Any existing client will need the new one.'
       )
     ) {
+      return;
+    }
+    // "nativeMessaging" is an optional permission — request it (with this
+    // click as the user gesture) the first time someone actually sets up
+    // the automation bridge, rather than asking for it at install time.
+    const granted = await browser.permissions.request({ permissions: ['nativeMessaging'] });
+    if (!granted) {
+      alert('The native-messaging bridge needs the "Native messaging" permission, which was not granted.');
       return;
     }
     const result = await browser.runtime.sendMessage({ type: 'native-token-regenerate' });

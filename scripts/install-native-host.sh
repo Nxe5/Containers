@@ -7,7 +7,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HOST_SCRIPT="$SCRIPT_DIR/native-host/index.js"
 HOST_NAME="com_companycontainers_host"
-EXTENSION_ID="company-containers@example.com"
+EXTENSION_ID="{d2e31876-bc5b-4d3c-b649-4b1faec96a87}"
 
 if [[ ! -f "$HOST_SCRIPT" ]]; then
   echo "error: $HOST_SCRIPT not found" >&2

@@ -14,6 +14,13 @@
   --input-bg: #ffffff;
   --input-border: #cccccc;
   --link: #0060df;
+  --danger-bg: #d70022;
+  --danger-hover: #b3001c;
+  --on-bg: #e6f4ea;
+  --on-text: #2a7a43;
+  --off-bg: #fbe4e4;
+  --off-text: #b3001c;
+  --overlay: rgba(0, 0, 0, 0.45);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -32,6 +39,13 @@
     --input-bg: #23222b;
     --input-border: #5b5b66;
     --link: #45a1ff;
+    --danger-bg: #d70022;
+    --danger-hover: #ff5252;
+    --on-bg: #1f3a28;
+    --on-text: #54ffbd;
+    --off-bg: #3a1f22;
+    --off-text: #ff8080;
+    --overlay: rgba(0, 0, 0, 0.6);
   }
 }
 
@@ -102,6 +116,40 @@ button.secondary {
 
 button.secondary:hover {
   background: var(--secondary-hover);
+}
+
+button.danger {
+  background: var(--danger-bg);
+  color: #ffffff;
+}
+
+button.danger:hover {
+  background: var(--danger-hover);
+}
+
+.ext-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-bottom: 4px;
+  background: var(--on-bg);
+  color: var(--on-text);
+}
+
+.ext-toggle-btn:hover {
+  filter: brightness(0.95);
+}
+
+.ext-toggle-btn.is-disabled {
+  background: var(--off-bg);
+  color: var(--off-text);
+}
+
+.ext-toggle-hint {
+  margin-top: 0;
+  margin-bottom: 12px;
 }
 
 button.icon-btn {
@@ -218,4 +266,37 @@ footer a {
   color: var(--link);
   text-decoration: none;
   font-size: 12px;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 10;
+}
+
+.modal {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px;
+  width: 100%;
+}
+
+.modal p {
+  margin: 0 0 8px;
+}
+
+.modal .hint {
+  margin-bottom: 12px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }

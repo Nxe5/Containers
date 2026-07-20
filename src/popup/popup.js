@@ -5,36 +5,7 @@ let currentAction = null;
 let vaultState = { exists: false, unlocked: false };
 let currentCredentialMatches = [];
 
-function fillCredentialCode(account, password) {
-  return `(() => {
-    const account = ${JSON.stringify(account)};
-    const password = ${JSON.stringify(password)};
-
-    const setValue = (el, value) => {
-      if (!el) return;
-      const proto = Object.getPrototypeOf(el);
-      const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
-      if (setter) setter.call(el, value);
-      else el.value = value;
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-      el.dispatchEvent(new Event('change', { bubbles: true }));
-    };
-
-    const passwordField = document.querySelector('input[type="password"]');
-    const scope = (passwordField && passwordField.form) || document;
-    let usernameField = scope.querySelector(
-      'input[type="email"], input[autocomplete="username"], input[name*="user" i], input[name*="email" i], input[id*="user" i], input[id*="email" i]'
-    );
-    if (!usernameField) {
-      usernameField = scope.querySelector('input[type="text"], input:not([type])');
-    }
-
-    if (usernameField && account) setValue(usernameField, account);
-    if (passwordField && password) setValue(passwordField, password);
-  })();`;
-}
-
-const BUILTIN_ORDER = ['google', 'microsoft', 'meta'];
+const BUILTIN_ORDER = ['youtube', 'gmail', 'github', 'amazon'];
 
 async function getCurrentTab() {
   const tabs = await browser.tabs.query({ active: true, currentWindow: true });
@@ -276,8 +247,47 @@ function renderHome() {
   renderContainerList(document.getElementById('homeContainers'), document.getElementById('homeSearch').value);
 }
 
+function renderExtensionToggle() {
+  const enabled = currentStatus.settings.extensionEnabled !== false;
+  const btn = document.getElementById('extensionToggleBtn');
+  btn.textContent = enabled ? 'Extension Enabled — Click to Disable' : 'Extension Disabled — Click to Enable';
+  btn.classList.toggle('is-disabled', !enabled);
+  document.getElementById('extensionToggleHint').classList.toggle('hidden', enabled);
+}
+
+async function setExtensionEnabled(value) {
+  await browser.runtime.sendMessage({ type: 'set-extension-enabled', value });
+  await loadStatus();
+  renderExtensionToggle();
+}
+
+function bindExtensionToggle() {
+  renderExtensionToggle();
+
+  const overlay = document.getElementById('disableConfirmOverlay');
+
+  document.getElementById('extensionToggleBtn').addEventListener('click', () => {
+    const enabled = currentStatus.settings.extensionEnabled !== false;
+    if (enabled) {
+      overlay.classList.remove('hidden');
+    } else {
+      setExtensionEnabled(true);
+    }
+  });
+
+  document.getElementById('disableConfirmCancel').addEventListener('click', () => {
+    overlay.classList.add('hidden');
+  });
+
+  document.getElementById('disableConfirmOk').addEventListener('click', async () => {
+    overlay.classList.add('hidden');
+    await setExtensionEnabled(false);
+  });
+}
+
 async function init() {
   await loadStatus();
+  bindExtensionToggle();
   if (!currentTabId) {
     document.getElementById('siteHint').textContent = 'No active tab';
     return;
@@ -329,7 +339,12 @@ async function init() {
     const cred = currentCredentialMatches[0];
     try {
       await browser.tabs.executeScript(currentTabId, {
-        code: fillCredentialCode(cred.account, cred.password),
+        file: '/src/content/fill-login.js',
+      });
+      await browser.tabs.sendMessage(currentTabId, {
+        type: 'fill-login-credential',
+        account: cred.account,
+        password: cred.password,
       });
     } catch (err) {
       console.error('[Company Containers] fill login failed', err);

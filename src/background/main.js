@@ -15,7 +15,45 @@ import {
 } from '../lib/containers.js';
 import { FRESH_TAB_URLS } from '../lib/defaults.js';
 import * as vault from '../lib/vault.js';
-import { initNativeMessaging } from '../lib/native-messaging.js';
+import { initNativeMessaging, stopNativeMessaging } from '../lib/native-messaging.js';
+
+// "proxy" and "nativeMessaging" are optional_permissions — most installs
+// never use per-container proxies or the automation bridge, so we don't ask
+// for them up front. Options page requests them (with a user gesture) the
+// first time someone actually configures either feature; these listeners
+// react to that grant (or a later revocation) whenever it happens.
+let proxyListenerActive = false;
+let nativeMessagingActive = false;
+
+async function syncProxyPermissionState() {
+  const granted = await browser.permissions.contains({ permissions: ['proxy'] });
+  // browser.proxy is only guaranteed accessible while the permission is held;
+  // guard the add/remove so a revocation racing this call can't throw and
+  // leave proxyListenerActive out of sync.
+  try {
+    if (granted && !proxyListenerActive) {
+      browser.proxy.onRequest.addListener(handleProxyRequest, { urls: ['<all_urls>'] });
+      proxyListenerActive = true;
+    } else if (!granted && proxyListenerActive) {
+      browser.proxy.onRequest.removeListener(handleProxyRequest);
+      proxyListenerActive = false;
+    }
+  } catch (err) {
+    console.warn('[Company Containers] proxy listener sync failed', err);
+    proxyListenerActive = granted && proxyListenerActive;
+  }
+}
+
+async function syncNativeMessagingPermissionState() {
+  const granted = await browser.permissions.contains({ permissions: ['nativeMessaging'] });
+  if (granted && !nativeMessagingActive) {
+    initNativeMessaging();
+    nativeMessagingActive = true;
+  } else if (!granted && nativeMessagingActive) {
+    stopNativeMessaging();
+    nativeMessagingActive = false;
+  }
+}
 
 let bundledDomainData = null;
 let domainData = null;
@@ -60,16 +98,32 @@ async function boot(reason = '') {
 
     rebuildDomainData();
 
-    const { changed } = await ensureContainers(settings, domainData);
-    if (changed) {
-      await saveSettings(settings);
+    // Container creation/GC can fail for reasons outside our control (a
+    // container was deleted externally, a name collision, browser limits).
+    // Never let those permanently prevent boot — the rest of the extension
+    // (popup, opener, message handling) should still work even if a
+    // container needs to be repaired on the next boot instead.
+    try {
+      const { changed } = await ensureContainers(settings, domainData);
+      if (changed) {
+        await saveSettings(settings);
+      }
+    } catch (err) {
+      console.error('[Company Containers] ensureContainers failed, continuing boot', err);
     }
 
-    await gcTemporaryContainers();
+    try {
+      await gcTemporaryContainers();
+    } catch (err) {
+      console.warn('[Company Containers] gc failed during boot', err);
+    }
+
     vault.configureAutoLock(settings.vaultAutoLockMinutes);
-    initNativeMessaging();
+    await syncProxyPermissionState();
+    await syncNativeMessagingPermissionState();
     booted = true;
-    console.log('[Company Containers] booted', reason, settings, state);
+    updateActionBadge();
+    console.log('[Company Containers] booted', reason);
   } catch (err) {
     console.error('[Company Containers] boot failed', err);
     throw err;
@@ -78,6 +132,17 @@ async function boot(reason = '') {
 
 function isHttpUrl(url) {
   return url && (url.startsWith('http://') || url.startsWith('https://'));
+}
+
+function updateActionBadge() {
+  const disabled = settings && settings.extensionEnabled === false;
+  browser.browserAction.setBadgeText({ text: disabled ? 'OFF' : '' });
+  if (disabled) {
+    browser.browserAction.setBadgeBackgroundColor({ color: '#d70022' });
+  }
+  browser.browserAction.setTitle({
+    title: disabled ? 'Company Containers (disabled)' : 'Company Containers',
+  });
 }
 
 function isFreshTab(tab, targetUrl) {
@@ -124,6 +189,7 @@ async function doReopen({ tab, url, cookieStoreId, reason, keepOriginal = false,
 
 async function handleBeforeRequest(details) {
   if (!booted) return {};
+  if (!settings.extensionEnabled) return {};
   if (details.tabId < 0) return {};
   if (!isHttpUrl(details.url)) return {};
   if (processedRequests.has(details.requestId)) return {};
@@ -210,7 +276,7 @@ async function vaultOp(fn) {
 }
 
 function handleProxyRequest(details) {
-  if (!booted) return [{ type: 'direct' }];
+  if (!booted || !settings.extensionEnabled) return [{ type: 'direct' }];
   const containerKey = getContainerKeyByCookieStoreId(details.cookieStoreId, settings);
   const proxy = containerKey ? getContainerProxy(containerKey, settings) : null;
   if (!proxy) return [{ type: 'direct' }];
@@ -218,7 +284,7 @@ function handleProxyRequest(details) {
 }
 
 async function handleProxyAuth(details) {
-  if (!booted || !details.isProxy || !vault.isUnlocked()) return {};
+  if (!booted || !settings.extensionEnabled || !details.isProxy || !vault.isUnlocked()) return {};
 
   let containerKey = null;
   if (details.tabId >= 0) {
@@ -315,6 +381,13 @@ async function handleMessage(message, sender, sendResponse) {
       return { settings };
     }
 
+    case 'set-extension-enabled': {
+      settings.extensionEnabled = message.value;
+      await saveSettings(settings);
+      updateActionBadge();
+      return { settings };
+    }
+
     case 'set-isolate-unmatched': {
       settings.isolateUnmatched = message.value;
       await saveSettings(settings);
@@ -391,6 +464,7 @@ async function handleMessage(message, sender, sendResponse) {
       rebuildDomainData();
       await ensureContainers(settings, domainData);
       await saveSettings(settings);
+      updateActionBadge();
       return { settings };
     }
 
@@ -552,7 +626,10 @@ async function init() {
     ['blocking']
   );
 
-  browser.proxy.onRequest.addListener(handleProxyRequest, { urls: ['<all_urls>'] });
+  // Registered by syncProxyPermissionState() (called from boot(), and again
+  // below whenever the optional "proxy" permission is granted/revoked at
+  // runtime from the options page) rather than unconditionally here, since
+  // browser.proxy isn't safe to touch before the permission is granted.
 
   browser.webRequest.onAuthRequired.addListener(
     handleProxyAuth,
@@ -564,6 +641,15 @@ async function init() {
   browser.tabs.onDetached.addListener(() => scheduleGc());
 
   browser.runtime.onMessage.addListener(handleMessage);
+
+  browser.permissions.onAdded.addListener(({ permissions }) => {
+    if (permissions.includes('proxy')) syncProxyPermissionState();
+    if (permissions.includes('nativeMessaging')) syncNativeMessagingPermissionState();
+  });
+  browser.permissions.onRemoved.addListener(({ permissions }) => {
+    if (permissions.includes('proxy')) syncProxyPermissionState();
+    if (permissions.includes('nativeMessaging')) syncNativeMessagingPermissionState();
+  });
 }
 
 init().catch((err) => console.error('[Company Containers] init error', err));
