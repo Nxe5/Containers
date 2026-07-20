@@ -11,6 +11,7 @@
         <header>
           <img src="../icons/icon.svg" alt="" width="20" height="20" />
           <span>Company Containers</span>
+          <button id="openOptions" class="icon-btn header-options-btn" aria-label="Options" title="Options">⚙</button>
         </header>
 
         <button id="extensionToggleBtn" class="ext-toggle-btn"></button>
@@ -35,6 +36,10 @@
             <input type="checkbox" id="replaceToggle" />
             <span>Replace tab instead of opening new one</span>
           </label>
+          <label class="toggle">
+            <input type="checkbox" id="stickyToggle" />
+            <span>Keep links in their origin container</span>
+          </label>
         </section>
 
         <section class="container-list-section">
@@ -42,10 +47,6 @@
           <input type="search" id="homeSearch" placeholder="Search containers…" />
           <div id="homeContainers" class="container-list"></div>
         </section>
-
-        <footer>
-          <a href="#" id="openOptions">Options</a>
-        </footer>
       </div>
 
       <!-- Container selection page -->

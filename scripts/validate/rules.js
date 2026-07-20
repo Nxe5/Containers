@@ -39,4 +39,55 @@ assert(r3.cookieStoreId === null && r3.reason === 'no-match', 'stay in temp');
 const r4 = resolveTarget({ hostname: 'work.example.com', currentCookieStoreId: 'firefox-default', domainData, settings, state });
 assert(r4.cookieStoreId === 'firefox-container-30' && r4.reason === 'user-rule', 'resolve user');
 
+// stickyContainers: off by default, so all the above still apply unchanged.
+// With it on, links stay in the current *named* container instead of moving
+// to a matched company or the temp fallback — but a Temporary Container is
+// still pass-through, and an explicit user rule still wins.
+const stickySettings = { ...settings, stickyContainers: true };
+
+const r5 = resolveTarget({
+  hostname: 'unknown.test',
+  currentCookieStoreId: 'firefox-container-10',
+  domainData,
+  settings: stickySettings,
+  state,
+});
+assert(r5.cookieStoreId === 'firefox-container-10' && r5.reason === 'sticky', 'sticky beats temp fallback');
+
+const r6 = resolveTarget({
+  hostname: 'facebook.com',
+  currentCookieStoreId: 'firefox-container-10',
+  domainData,
+  settings: stickySettings,
+  state,
+});
+assert(r6.cookieStoreId === 'firefox-container-10' && r6.reason === 'sticky', 'sticky beats a different company match');
+
+const r7 = resolveTarget({
+  hostname: 'youtube.com',
+  currentCookieStoreId: 'firefox-container-99',
+  domainData,
+  settings: stickySettings,
+  state,
+});
+assert(r7.cookieStoreId === 'firefox-container-10' && r7.reason === 'company:google', 'sticky does not apply inside a temp container');
+
+const r8 = resolveTarget({
+  hostname: 'work.example.com',
+  currentCookieStoreId: 'firefox-container-10',
+  domainData,
+  settings: stickySettings,
+  state,
+});
+assert(r8.cookieStoreId === 'firefox-container-30' && r8.reason === 'user-rule', 'user rule still beats sticky');
+
+const r9 = resolveTarget({
+  hostname: 'youtube.com',
+  currentCookieStoreId: 'firefox-default',
+  domainData,
+  settings: stickySettings,
+  state,
+});
+assert(r9.cookieStoreId === 'firefox-container-10' && r9.reason === 'company:google', 'sticky does not block first entry from the default container');
+
 console.log('All rule tests passed');

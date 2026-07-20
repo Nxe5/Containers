@@ -198,6 +198,7 @@ function populateSelect(select, values, selected) {
 function renderGlobals() {
   const s = currentStatus.settings;
   $('isolateUnmatched').checked = s.isolateUnmatched !== false;
+  $('stickyContainers').checked = s.stickyContainers === true;
   $('tempPrefix').value = s.tempPrefix || 'Temp';
   populateSelect($('tempColor'), COLORS, s.tempColor || 'toolbar');
   populateSelect($('tempIcon'), ICONS, s.tempIcon || 'circle');
@@ -908,6 +909,7 @@ async function saveGlobals() {
     type: 'update-settings',
     settings: {
       isolateUnmatched: $('isolateUnmatched').checked,
+      stickyContainers: $('stickyContainers').checked,
       tempPrefix: $('tempPrefix').value.trim() || 'Temp',
       tempColor: $('tempColor').value,
       tempIcon: $('tempIcon').value,
@@ -1138,6 +1140,7 @@ async function init() {
   });
 
   $('isolateUnmatched').addEventListener('change', saveGlobals);
+  $('stickyContainers').addEventListener('change', saveGlobals);
   $('tempPrefix').addEventListener('change', saveGlobals);
   $('tempColor').addEventListener('change', saveGlobals);
   $('tempIcon').addEventListener('change', saveGlobals);

@@ -13,7 +13,6 @@
   --item-hover: #f0f0f0;
   --input-bg: #ffffff;
   --input-border: #cccccc;
-  --link: #0060df;
   --danger-bg: #d70022;
   --danger-hover: #b3001c;
   --on-bg: #e6f4ea;
@@ -38,7 +37,6 @@
     --item-hover: #2b2a33;
     --input-bg: #23222b;
     --input-border: #5b5b66;
-    --link: #45a1ff;
     --danger-bg: #d70022;
     --danger-hover: #ff5252;
     --on-bg: #1f3a28;
@@ -164,6 +162,11 @@ button.icon-btn:hover {
   background: var(--item-hover);
 }
 
+.header-options-btn {
+  margin-left: auto;
+  font-size: 15px;
+}
+
 .action-btn.primary {
   text-align: left;
   background: var(--secondary-bg);
@@ -255,17 +258,6 @@ input[type="search"], input[type="text"] {
 .container-item .subtitle {
   color: var(--muted);
   font-size: 11px;
-}
-
-footer {
-  text-align: right;
-  margin-top: 8px;
-}
-
-footer a {
-  color: var(--link);
-  text-decoration: none;
-  font-size: 12px;
 }
 
 .modal-overlay {

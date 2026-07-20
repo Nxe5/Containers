@@ -25,6 +25,16 @@ export const DEFAULT_SETTINGS = Object.freeze({
   // of opening a new tab next to it.
   replaceTabInsteadOfNew: false,
 
+  // Once a tab is already inside a named (built-in or custom) container,
+  // keep links it opens — including ones opened in a new tab, which Firefox
+  // already assigns the opener's container — in that same container instead
+  // of letting domain rules or the Temporary Container fallback move them
+  // elsewhere. Does not apply while already inside a Temporary Container: a
+  // link to a domain with its own dedicated container (e.g. github.com)
+  // still hands off to that container so you land in your logged-in session
+  // rather than staying in a disposable one.
+  stickyContainers: false,
+
   // Per-company toggles and the cookieStoreId of the container we created.
   // cookieStoreId is persisted after first run.
   companies: {

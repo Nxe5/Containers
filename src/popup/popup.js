@@ -242,6 +242,7 @@ function renderHome() {
   // Toggles.
   document.getElementById('isolateToggle').checked = status.settings.isolateUnmatched !== false;
   document.getElementById('replaceToggle').checked = status.settings.replaceTabInsteadOfNew === true;
+  document.getElementById('stickyToggle').checked = status.settings.stickyContainers === true;
 
   // Container list.
   renderContainerList(document.getElementById('homeContainers'), document.getElementById('homeSearch').value);
@@ -285,9 +286,17 @@ function bindExtensionToggle() {
   });
 }
 
+function bindHeaderOptions() {
+  document.getElementById('openOptions').addEventListener('click', () => {
+    browser.runtime.openOptionsPage();
+    window.close();
+  });
+}
+
 async function init() {
   await loadStatus();
   bindExtensionToggle();
+  bindHeaderOptions();
   if (!currentTabId) {
     document.getElementById('siteHint').textContent = 'No active tab';
     return;
@@ -333,6 +342,14 @@ async function init() {
     await loadStatus();
   });
 
+  document.getElementById('stickyToggle').addEventListener('change', async (e) => {
+    await browser.runtime.sendMessage({
+      type: 'set-sticky-containers',
+      value: e.target.checked,
+    });
+    await loadStatus();
+  });
+
   // Fill login button.
   document.getElementById('fillLoginBtn').addEventListener('click', async () => {
     if (currentCredentialMatches.length === 0 || !currentTabId) return;
@@ -349,13 +366,6 @@ async function init() {
     } catch (err) {
       console.error('[Company Containers] fill login failed', err);
     }
-    window.close();
-  });
-
-  // Options link.
-  document.getElementById('openOptions').addEventListener('click', (e) => {
-    e.preventDefault();
-    browser.runtime.openOptionsPage();
     window.close();
   });
 }

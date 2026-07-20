@@ -95,8 +95,10 @@ export function getContainerProxy(containerKey, settings) {
  * Precedence:
  *   1. One-shot external hint for this exact URL.
  *   2. User rule.
- *   3. Enabled company default.
- *   4. Temporary container fallback (only if enabled).
+ *   3. Sticky containers (only if enabled): stay in the current tab's
+ *      container if it's already a named (built-in or custom) container.
+ *   4. Enabled company default.
+ *   5. Temporary container fallback (only if enabled).
  *
  * Returns { cookieStoreId, reason } where reason is a short string.
  */
@@ -125,7 +127,23 @@ export function resolveTarget({
     return { cookieStoreId: userMatch, reason: 'user-rule' };
   }
 
-  // 3. Company defaults.
+  // 3. Sticky containers. Once you're inside a named container, links it
+  // opens (including in a new tab, since Firefox already assigns the
+  // opener's container to it) stay there instead of being moved by a
+  // company rule or the temporary-container fallback below. Deliberately
+  // does not apply inside a Temporary Container: a link to a domain with its
+  // own dedicated container should still hand off to it, landing in the
+  // logged-in session rather than staying in a disposable container.
+  if (
+    settings?.stickyContainers &&
+    currentCookieStoreId &&
+    currentCookieStoreId !== 'firefox-default' &&
+    !isTemporaryContainerId(currentCookieStoreId, state)
+  ) {
+    return { cookieStoreId: currentCookieStoreId, reason: 'sticky' };
+  }
+
+  // 4. Company defaults.
   const companyKey = matchCompany(h, domainData, settings);
   if (companyKey && isCompanyEnabled(companyKey, settings)) {
     const id = getCompanyCookieStoreId(companyKey, settings);
@@ -134,7 +152,7 @@ export function resolveTarget({
     }
   }
 
-  // 4. Temporary container fallback.
+  // 5. Temporary container fallback.
   if (
     allowTempFallback &&
     settings?.isolateUnmatched &&

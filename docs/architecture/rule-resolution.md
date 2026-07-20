@@ -15,9 +15,11 @@ Signals are checked **in this order**, highest priority first. The first match w
    "reopen in X" is never immediately overridden by a domain rule.
 2. **User override** — a `hostname → container` rule from the Options page. Matches
    the exact host or any subdomain of it.
-3. **Company / custom default** — the hostname matches a built-in company's domain
+3. **Sticky containers** (only if `stickyContainers` is on) — if the tab is already in
+   a named container, stay there. See [below](#sticky-containers).
+4. **Company / custom default** — the hostname matches a built-in company's domain
    list (or a custom container's), and that container is enabled.
-4. **Temporary container fallback** — nothing matched. If "isolate unmatched" is on
+5. **Temporary container fallback** — nothing matched. If "isolate unmatched" is on
    *and* the tab isn't already in a temporary container, the engine signals that a
    fresh temporary container should be created (`createTemp: true`).
 
@@ -28,6 +30,25 @@ the result is `no-match` and the tab is left where it is.
 > behavior in code. An explicit action should always win for the navigation it
 > triggered.
 
+## Sticky containers
+
+With `settings.stickyContainers` on, once a tab is inside a **named** container
+(built-in or custom — anything except the default "no container" and except a
+Temporary Container), links it opens stay in that same container instead of being
+moved by a company-domain match or the temp fallback. This covers links opened in a
+new tab too: Firefox already assigns a new tab the opener's container before our
+listener runs, so `currentCookieStoreId` is correct without any extra listener setup.
+
+It's deliberately scoped to **exclude** Temporary Containers: a link to a domain with
+its own dedicated container (e.g. a `github.com` link clicked while browsing in a
+disposable temp container) still hands off to that dedicated container, so you land
+in your logged-in session rather than staying in a throwaway one. A user override
+still wins over sticky, since it's checked first and is a more specific, deliberate
+signal.
+
+Toggle it from the popup ("Keep links in their origin container") or the Options
+page's Global settings.
+
 ## Domain matching
 
 `matchesDomain(hostname, domain)` matches when the hostname **equals** the domain
@@ -37,8 +58,8 @@ dot is stripped before comparison (`normalizeHostname`).
 
 ## Domain lists
 
-Built-in lists live in `src/data/domains.json`, keyed by company (`google`,
-`microsoft`, `meta`). Each entry has a `label`, `color`, `icon`, and `domains[]`.
+Built-in lists live in `src/data/domains.json`, keyed by company (`youtube`,
+`gmail`, `github`, `amazon`). Each entry has a `label`, `color`, `icon`, and `domains[]`.
 The Options page can **override** a company's list entirely (stored in
 `settings.domainOverrides`) without editing the file; `getEffectiveDomainList()`
 returns the override if present, otherwise the bundled list.

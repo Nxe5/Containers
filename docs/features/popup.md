@@ -19,6 +19,12 @@ works on every page, including `about:` pages where the rest of the popup is ine
 Flipping it sends `set-extension-enabled`; the engine persists the flag and updates
 the toolbar `OFF` badge. See [architecture/overview.md](../architecture/overview.md#the-master-switch).
 
+## Options button
+
+A gear icon (⚙) in the top-right of the header opens the [Options page](./options.md)
+(`browser.runtime.openOptionsPage()`) and closes the popup. Like the enable/disable
+switch, it's bound before the "no active tab" early-return, so it always works.
+
 ## Home page
 
 - **Open new tab in…** — pick a container for a fresh empty tab.
@@ -28,8 +34,10 @@ the toolbar `OFF` badge. See [architecture/overview.md](../architecture/overview
 - **Site hint** — shows the current hostname (or that no site is active).
 - **Fill login** — appears only when the [vault](./vault.md) is unlocked and has a
   credential for the current site. See below.
-- **Toggles** — "Auto isolate all unmatched tabs" (`isolateUnmatched`) and "Replace
-  tab instead of opening new one" (`replaceTabInsteadOfNew`).
+- **Toggles** — "Auto isolate all unmatched tabs" (`isolateUnmatched`), "Replace tab
+  instead of opening new one" (`replaceTabInsteadOfNew`), and "Keep links in their
+  origin container" (`stickyContainers` — see
+  [rule-resolution.md](../architecture/rule-resolution.md#sticky-containers)).
 - **Containers list** — searchable; click any container to open/reopen there. Also
   offers "Default (no container)" and "Temporary Container".
 

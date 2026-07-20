@@ -400,6 +400,12 @@ async function handleMessage(message, sender, sendResponse) {
       return { settings };
     }
 
+    case 'set-sticky-containers': {
+      settings.stickyContainers = message.value;
+      await saveSettings(settings);
+      return { settings };
+    }
+
     case 'open-empty-tab': {
       const tabs = await browser.tabs.query({ active: true, currentWindow: true });
       const tab = tabs[0];
