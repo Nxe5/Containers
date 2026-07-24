@@ -49,6 +49,41 @@ signal.
 Toggle it from the popup ("Keep links in their origin container") or the Options
 page's Global settings.
 
+## Sign-in flow preservation
+
+Sticky containers cover named containers only, which leaves two origins where an
+auth chain used to get yanked away mid-flow: Temporary Containers and "no
+container". Clicking **Login with GitHub** on a site would hop to
+`github.com/login/oauth/authorize`, match the GitHub company rule, and relocate
+the flow into the global GitHub container — completing the login as whatever
+account lives there instead of the one the starting container holds.
+
+With `settings.preserveAuthFlows` on (the default), `handleBeforeRequest()` skips
+relocation entirely — **before** `resolveTarget()` runs, so it applies from every
+origin — when either signal fires:
+
+1. **Redirect-chain membership.** Every leg of a server-redirect chain shares one
+   `requestId`. An `onBeforeRedirect` listener records the id, and any navigation
+   arriving under a recorded id is left where it is. This follows the whole OAuth
+   round-trip (site → provider → back to the site's `redirect_uri`) with no URL
+   knowledge, including the provider's post-login `302` — and the id is dropped
+   once the request completes or errors.
+2. **Auth-shaped URL.** `looksLikeAuthNavigation()` in `rules.js` matches
+   authorization-endpoint query params (`client_id` + `redirect_uri`,
+   `response_type`, `SAMLRequest`/`SAMLResponse`) or a dedicated auth path
+   segment (`/oauth`, `/authorize`, `/login`, `/signin`, `/sso`, `/saml`, …).
+   This catches sites that JS-navigate straight to the authorize URL rather
+   than server-redirecting to it.
+
+Ordinary links are unaffected: a plain `github.com` link is neither a redirect
+leg nor auth-shaped, so company rules and the temp fallback apply as usual. Known
+tradeoffs: a link-shortener hop (one redirect leg) stays in the origin container
+instead of handing off, and a direct navigation to an auth-shaped URL won't
+follow a user override — deliberate, since relocating mid-chain is exactly what
+breaks logins.
+
+Toggle from the popup: "Keep sign-in flows where they start".
+
 ## Domain matching
 
 `matchesDomain(hostname, domain)` matches when the hostname **equals** the domain

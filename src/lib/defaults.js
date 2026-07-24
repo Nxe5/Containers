@@ -40,6 +40,18 @@ export const DEFAULT_SETTINGS = Object.freeze({
   // redirect in the container that started it lets those cookies persist.
   stickyContainers: true,
 
+  // Keep sign-in flows in the container they started in, regardless of which
+  // container that is (named, temporary, or none). Covers the whole chain two
+  // ways: (1) any navigation that arrives as a server-redirect leg of an
+  // in-flight request is never relocated, which follows an OAuth round-trip
+  // out and back by requestId with no URL knowledge; (2) navigations whose
+  // URL looks like an auth endpoint (looksLikeAuthNavigation in rules.js)
+  // are never relocated, catching sites that JS-navigate straight to the
+  // authorize URL instead of redirecting. Without this, "Login with GitHub"
+  // on some site gets yanked into the global GitHub container mid-flow —
+  // wrong account if the starting container held a different GitHub login.
+  preserveAuthFlows: true,
+
   // Per-company toggles and the cookieStoreId of the container we created.
   // cookieStoreId is persisted after first run.
   companies: {

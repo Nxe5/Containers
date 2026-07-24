@@ -1,4 +1,4 @@
-import { matchCompany, matchUserRule, resolveTarget } from '../../src/lib/rules.js';
+import { matchCompany, matchUserRule, resolveTarget, looksLikeAuthNavigation } from '../../src/lib/rules.js';
 
 const domainData = {
   google: { label: 'Google', domains: ['google.com', 'youtube.com'] },
@@ -89,5 +89,19 @@ const r9 = resolveTarget({
   state,
 });
 assert(r9.cookieStoreId === 'firefox-container-10' && r9.reason === 'company:google', 'sticky does not block first entry from the default container');
+
+// looksLikeAuthNavigation — the URL half of preserveAuthFlows (redirect-chain
+// tracking, the other half, lives in the background engine and needs a live
+// webRequest to exercise).
+assert(looksLikeAuthNavigation('https://github.com/login/oauth/authorize?client_id=abc&redirect_uri=https%3A%2F%2Fexample.com%2Fcb'), 'oauth authorize with params');
+assert(looksLikeAuthNavigation('https://example.com/cb?response_type=code'), 'response_type param alone');
+assert(looksLikeAuthNavigation('https://idp.example.com/x?SAMLRequest=abc'), 'SAMLRequest param');
+assert(looksLikeAuthNavigation('https://accounts.example.com/signin'), 'signin path segment');
+assert(looksLikeAuthNavigation('https://example.com/auth/v1/callback'), 'auth path segment mid-path');
+assert(looksLikeAuthNavigation('https://github.com/login'), 'login path at end');
+assert(!looksLikeAuthNavigation('https://example.com/blog/login-tips'), 'segment-anchored: /blog/login-tips is not auth');
+assert(!looksLikeAuthNavigation('https://github.com/user/repo'), 'plain repo page is not auth');
+assert(!looksLikeAuthNavigation('https://example.com/?q=client_id'), 'client_id alone without redirect_uri is not auth');
+assert(!looksLikeAuthNavigation('not a url'), 'garbage input is not auth');
 
 console.log('All rule tests passed');

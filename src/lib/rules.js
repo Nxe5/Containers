@@ -164,6 +164,37 @@ export function resolveTarget({
   return { cookieStoreId: null, reason: 'no-match' };
 }
 
+/**
+ * Heuristic: does this URL look like a hop in a sign-in flow (OAuth2 /
+ * OIDC / SAML / plain login page)? Used to keep an auth chain in the
+ * container it started in instead of relocating it by company rule —
+ * "Login with GitHub" on some site should use *that tab's* container (and
+ * whatever account is signed in there), not yank the flow into the global
+ * GitHub container.
+ *
+ * Two signals, either suffices:
+ *  1. Query params that only appear on authorization/SSO endpoints
+ *     (client_id + redirect_uri together, response_type, SAMLRequest/Response).
+ *  2. A path segment that marks dedicated auth endpoints (/oauth, /authorize,
+ *     /signin, /sso, /saml, /login). Segment-anchored so e.g. /blog/login-tips
+ *     doesn't match.
+ */
+const AUTH_PATH_RE = /(^|\/)(oauth2?|authorize|auth|login|signin|sign-in|sso|saml2?|openid|idp)(\/|$)/i;
+
+export function looksLikeAuthNavigation(urlString) {
+  let url;
+  try {
+    url = new URL(urlString);
+  } catch {
+    return false;
+  }
+  const params = url.searchParams;
+  if (params.has('client_id') && params.has('redirect_uri')) return true;
+  if (params.has('response_type')) return true;
+  if (params.has('SAMLRequest') || params.has('SAMLResponse')) return true;
+  return AUTH_PATH_RE.test(url.pathname);
+}
+
 export function isTemporaryContainerId(cookieStoreId, state) {
   return (
     cookieStoreId != null &&

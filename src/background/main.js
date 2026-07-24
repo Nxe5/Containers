@@ -4,6 +4,7 @@ import {
   getEffectiveDomainList,
   getContainerKeyByCookieStoreId,
   getContainerProxy,
+  looksLikeAuthNavigation,
 } from '../lib/rules.js';
 import {
   ensureContainers,
@@ -62,6 +63,12 @@ let state = null;
 let booted = false;
 let gcTimeout = null;
 const processedRequests = new Set();
+// requestIds of main_frame requests currently inside a server-redirect chain.
+// Every leg of a redirect keeps the same requestId, so membership here means
+// "this navigation arrived via redirect" — see the preserveAuthFlows guard in
+// handleBeforeRequest. Entries are removed when the request completes or
+// errors, so the set stays small.
+const redirectChainRequests = new Set();
 
 async function loadDomainData() {
   const url = browser.runtime.getURL('/src/data/domains.json');
@@ -202,6 +209,20 @@ async function handleBeforeRequest(details) {
   // whatever container they're already in.
   if (details.method && details.method !== 'GET') return {};
   if (processedRequests.has(details.requestId)) return {};
+
+  // Keep sign-in flows in the container they started in (see defaults.js).
+  // A navigation is part of an auth chain if it arrived as a server-redirect
+  // leg (same requestId as the request that redirected — catches the whole
+  // OAuth round-trip with no URL knowledge) or if its URL looks like an auth
+  // endpoint (catches sites that JS-navigate straight to the authorize URL).
+  // Checked before any container resolution so it applies from every origin:
+  // named containers, Temporary Containers, and no container at all.
+  if (
+    settings.preserveAuthFlows &&
+    (redirectChainRequests.has(details.requestId) || looksLikeAuthNavigation(details.url))
+  ) {
+    return {};
+  }
 
   let tab;
   try {
@@ -424,6 +445,12 @@ async function handleMessage(message, sender, sendResponse) {
 
     case 'set-sticky-containers': {
       settings.stickyContainers = message.value;
+      await saveSettings(settings);
+      return { settings };
+    }
+
+    case 'set-preserve-auth-flows': {
+      settings.preserveAuthFlows = message.value;
       await saveSettings(settings);
       return { settings };
     }
@@ -658,6 +685,22 @@ async function init() {
     { urls: ['<all_urls>'], types: ['main_frame'] },
     ['blocking']
   );
+
+  // Track server-redirect chains for the preserveAuthFlows guard. Every leg
+  // of a redirect keeps its requestId, so marking the id on the first
+  // redirect covers all subsequent legs — including a POST login that 302s
+  // back to the relying party (the redirected leg arrives as a GET with the
+  // same id). Cleared when the request finishes either way.
+  const redirectFilter = { urls: ['<all_urls>'], types: ['main_frame'] };
+  browser.webRequest.onBeforeRedirect.addListener((details) => {
+    redirectChainRequests.add(details.requestId);
+  }, redirectFilter);
+  browser.webRequest.onCompleted.addListener((details) => {
+    redirectChainRequests.delete(details.requestId);
+  }, redirectFilter);
+  browser.webRequest.onErrorOccurred.addListener((details) => {
+    redirectChainRequests.delete(details.requestId);
+  }, redirectFilter);
 
   // Registered by syncProxyPermissionState() (called from boot(), and again
   // below whenever the optional "proxy" permission is granted/revoked at

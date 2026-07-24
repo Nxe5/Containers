@@ -24,6 +24,10 @@
           <input type="checkbox" id="stickyContainers" />
           <span>Keep links in their origin container (once already in a named container, links stay there instead of moving to another company's container or a Temporary Container)</span>
         </label>
+        <label class="toggle">
+          <input type="checkbox" id="preserveAuthFlows" />
+          <span>Keep sign-in flows where they start (OAuth/SSO chains — "Login with GitHub" and the like — stay in the container the flow began in, even a Temporary Container or no container, instead of hopping to the provider's container mid-login)</span>
+        </label>
 
         <div class="grid three">
           <label>

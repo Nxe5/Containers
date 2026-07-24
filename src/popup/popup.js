@@ -276,6 +276,7 @@ function renderHome() {
   document.getElementById('isolateToggle').checked = status.settings.isolateUnmatched !== false;
   document.getElementById('replaceToggle').checked = status.settings.replaceTabInsteadOfNew === true;
   document.getElementById('stickyToggle').checked = status.settings.stickyContainers === true;
+  document.getElementById('authFlowToggle').checked = status.settings.preserveAuthFlows !== false;
 
   // Container list.
   renderContainerList(document.getElementById('homeContainers'), document.getElementById('homeSearch').value);
@@ -378,6 +379,14 @@ async function init() {
   document.getElementById('stickyToggle').addEventListener('change', async (e) => {
     await browser.runtime.sendMessage({
       type: 'set-sticky-containers',
+      value: e.target.checked,
+    });
+    await loadStatus();
+  });
+
+  document.getElementById('authFlowToggle').addEventListener('change', async (e) => {
+    await browser.runtime.sendMessage({
+      type: 'set-preserve-auth-flows',
       value: e.target.checked,
     });
     await loadStatus();

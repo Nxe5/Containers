@@ -35,9 +35,11 @@ switch, it's bound before the "no active tab" early-return, so it always works.
 - **Fill login** — appears only when the [vault](./vault.md) is unlocked and has a
   credential for the current site. See below.
 - **Toggles** — "Auto isolate all unmatched tabs" (`isolateUnmatched`), "Replace tab
-  instead of opening new one" (`replaceTabInsteadOfNew`), and "Keep links in their
+  instead of opening new one" (`replaceTabInsteadOfNew`), "Keep links in their
   origin container" (`stickyContainers` — see
-  [rule-resolution.md](../architecture/rule-resolution.md#sticky-containers)).
+  [rule-resolution.md](../architecture/rule-resolution.md#sticky-containers)), and
+  "Keep sign-in flows where they start" (`preserveAuthFlows` — see
+  [rule-resolution.md](../architecture/rule-resolution.md#sign-in-flow-preservation)).
 - **Containers list** — searchable; click any container to open/reopen there. Also
   offers "Default (no container)" and "Temporary Container".
 
