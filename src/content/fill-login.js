@@ -22,7 +22,13 @@
     let usernameField = scope.querySelector(
       'input[type="email"], input[autocomplete="username"], input[name*="user" i], input[name*="email" i], input[id*="user" i], input[id*="email" i]'
     );
-    if (!usernameField) {
+    // Only fall back to a generic text input when a password field is actually
+    // present — i.e. this really is a login form. Without that guard, clicking
+    // "Fill login" on a page with no login (e.g. a plain search box) could dump
+    // the saved username into an unrelated text field. Two-step "username
+    // first" pages (Google et al.) still fill: their identifier input carries a
+    // type=email / autocomplete=username hint matched by the selector above.
+    if (!usernameField && passwordField) {
       usernameField = scope.querySelector('input[type="text"], input:not([type])');
     }
 

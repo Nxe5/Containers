@@ -2,7 +2,7 @@
 'use strict';
 
 /**
- * Native Messaging host for Company Containers.
+ * Native Messaging host for Containers.
  *
  * Firefox spawns this process when the extension calls
  * browser.runtime.connectNative(). It speaks the native-messaging framing

@@ -20,8 +20,10 @@ pnpm run build    # writes web-ext-artifacts/company_containers-<version>.zip
       **no source-code submission is required**.
 - [x] **Extension ID set** — `browser_specific_settings.gecko.id` is a stable UUID.
       (The native-host installer's `allowed_extensions` uses the same ID.)
-- [x] **Minimum version** — `strict_min_version` is `142.0` (needed for the declared
-      `data_collection_permissions`).
+- [x] **Minimum version** — `strict_min_version` is `140.0`. The mandatory
+      `data_collection_permissions` key is honored from Firefox 140, so 140 is the
+      lowest floor that both satisfies AMO and covers the current ESR (140) plus all
+      release Firefox. Desktop-only (see below).
 - [x] **Data collection declared** — `required: ["none"]`; the extension transmits
       nothing off-device.
 - [x] **Icons present** — `icon.svg` covers the required sizes.
@@ -72,5 +74,6 @@ See [permissions.md](./permissions.md) for the full per-permission justification
 - **Chrome Web Store is not applicable** — the extension depends on Firefox-only
   container APIs and blocking `webRequest`. See
   [architecture/overview.md](../architecture/overview.md#why-firefox-only).
-- **Firefox for Android:** the manifest targets 142+ on Android too, but containers
-  and this UI are desktop-oriented — test before advertising Android support.
+- **Firefox for Android:** not supported. Firefox for Android does not implement the
+  `contextualIdentities` (container) API, so the extension cannot function there.
+  List it as desktop-only in the AMO compatibility settings.

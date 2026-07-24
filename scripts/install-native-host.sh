@@ -37,7 +37,7 @@ MANIFEST_PATH="$TARGET_DIR/$HOST_NAME.json"
 cat > "$MANIFEST_PATH" <<EOF
 {
   "name": "$HOST_NAME",
-  "description": "Company Containers native messaging host",
+  "description": "Containers native messaging host",
   "path": "$HOST_SCRIPT",
   "type": "stdio",
   "allowed_extensions": ["$EXTENSION_ID"]

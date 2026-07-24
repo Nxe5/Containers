@@ -39,7 +39,7 @@ async function syncProxyPermissionState() {
       proxyListenerActive = false;
     }
   } catch (err) {
-    console.warn('[Company Containers] proxy listener sync failed', err);
+    console.warn('[Better Containers] proxy listener sync failed', err);
     proxyListenerActive = granted && proxyListenerActive;
   }
 }
@@ -109,13 +109,13 @@ async function boot(reason = '') {
         await saveSettings(settings);
       }
     } catch (err) {
-      console.error('[Company Containers] ensureContainers failed, continuing boot', err);
+      console.error('[Better Containers] ensureContainers failed, continuing boot', err);
     }
 
     try {
       await gcTemporaryContainers();
     } catch (err) {
-      console.warn('[Company Containers] gc failed during boot', err);
+      console.warn('[Better Containers] gc failed during boot', err);
     }
 
     vault.configureAutoLock(settings.vaultAutoLockMinutes);
@@ -123,9 +123,9 @@ async function boot(reason = '') {
     await syncNativeMessagingPermissionState();
     booted = true;
     updateActionBadge();
-    console.log('[Company Containers] booted', reason);
+    console.log('[Better Containers] booted', reason);
   } catch (err) {
-    console.error('[Company Containers] boot failed', err);
+    console.error('[Better Containers] boot failed', err);
     throw err;
   }
 }
@@ -141,7 +141,7 @@ function updateActionBadge() {
     browser.browserAction.setBadgeBackgroundColor({ color: '#d70022' });
   }
   browser.browserAction.setTitle({
-    title: disabled ? 'Company Containers (disabled)' : 'Company Containers',
+    title: disabled ? 'Better Containers (disabled)' : 'Better Containers',
   });
 }
 
@@ -171,7 +171,7 @@ async function doReopen({ tab, url, cookieStoreId, reason, keepOriginal = false,
   try {
     await browser.tabs.create(createProps);
   } catch (err) {
-    console.error('[Company Containers] tabs.create failed', err);
+    console.error('[Better Containers] tabs.create failed', err);
     return false;
   }
 
@@ -179,11 +179,11 @@ async function doReopen({ tab, url, cookieStoreId, reason, keepOriginal = false,
     try {
       await browser.tabs.remove(tab.id);
     } catch (err) {
-      console.warn('[Company Containers] failed to remove original tab', tab.id, err);
+      console.warn('[Better Containers] failed to remove original tab', tab.id, err);
     }
   }
 
-  console.log('[Company Containers] reopened', url, '->', cookieStoreId, 'reason:', reason, 'fresh:', fresh);
+  console.log('[Better Containers] reopened', url, '->', cookieStoreId, 'reason:', reason, 'fresh:', fresh);
   return true;
 }
 
@@ -192,6 +192,15 @@ async function handleBeforeRequest(details) {
   if (!settings.extensionEnabled) return {};
   if (details.tabId < 0) return {};
   if (!isHttpUrl(details.url)) return {};
+  // Only ever relocate GET navigations. We move a request to another
+  // container by cancelling it and re-creating the tab, and tabs.create can
+  // only issue a GET — so reopening a POST would drop its body and corrupt
+  // the request. This matters most for auth: OAuth/OIDC callbacks using
+  // response_mode=form_post (Google, others) POST the token back at the top
+  // level, and login forms POST too. Reopening those as GET produces a
+  // malformed request and a provider-side 400. Leave non-GET navigations in
+  // whatever container they're already in.
+  if (details.method && details.method !== 'GET') return {};
   if (processedRequests.has(details.requestId)) return {};
 
   let tab;
@@ -205,6 +214,19 @@ async function handleBeforeRequest(details) {
   // with Private Browsing).
   if (tab.url && tab.url.startsWith(browser.runtime.getURL(''))) return {};
   if (tab.incognito) return {};
+
+  // Never relocate a navigation inside a popup window. "Sign in with Google"
+  // and similar flows open a small popup via window.open() and hand the
+  // result back to the page that launched it through window.opener. We move a
+  // request between containers by cancelling it and re-creating the tab, which
+  // severs that opener link — so the popup completes but the parent page never
+  // receives the token and the sign-in silently fails. Leave popups alone.
+  try {
+    const win = await browser.windows.get(tab.windowId);
+    if (win.type === 'popup') return {};
+  } catch {
+    // Window already gone or inaccessible; fall through and treat as normal.
+  }
 
   const url = new URL(details.url);
   const currentCookieStoreId = tab.cookieStoreId || 'firefox-default';
@@ -315,7 +337,7 @@ function scheduleGc() {
       await gcTemporaryContainers();
       state = await loadState();
     } catch (err) {
-      console.warn('[Company Containers] scheduled GC failed', err);
+      console.warn('[Better Containers] scheduled GC failed', err);
     }
   }, 1500);
 }
@@ -449,7 +471,7 @@ async function handleMessage(message, sender, sendResponse) {
         try {
           await browser.contextualIdentities.remove(cfg.cookieStoreId);
         } catch (err) {
-          console.warn('[Company Containers] failed to remove container', cfg.cookieStoreId, err);
+          console.warn('[Better Containers] failed to remove container', cfg.cookieStoreId, err);
         }
         // Drop any user rules that pointed at this container.
         const userRules = { ...(settings.userRules || {}) };
@@ -466,7 +488,12 @@ async function handleMessage(message, sender, sendResponse) {
 
     case 'reset-settings': {
       const { DEFAULT_SETTINGS } = await import('../lib/defaults.js');
-      settings = { ...DEFAULT_SETTINGS };
+      // Deep-clone: DEFAULT_SETTINGS is only shallow-frozen, so a spread would
+      // leave nested objects (companies, customContainers, …) aliased to the
+      // constant. ensureContainers() then writes cookieStoreIds straight into
+      // that shared object, permanently polluting the defaults for the rest of
+      // the session. structuredClone gives a fully independent, mutable copy.
+      settings = structuredClone(DEFAULT_SETTINGS);
       rebuildDomainData();
       await ensureContainers(settings, domainData);
       await saveSettings(settings);
@@ -658,4 +685,4 @@ async function init() {
   });
 }
 
-init().catch((err) => console.error('[Company Containers] init error', err));
+init().catch((err) => console.error('[Better Containers] init error', err));

@@ -1,4 +1,4 @@
-# Company Containers
+# Better Containers
 
 A Firefox extension that automatically isolates **YouTube**, **Gmail**,
 **GitHub**, and **Amazon** into their own [containers](https://support.mozilla.org/en-US/kb/containers),
@@ -66,15 +66,16 @@ See [`PRIVACY.md`](./PRIVACY.md) for the full policy.
 
 ## Compatibility
 
-Firefox **142+** (desktop and Android). This extension relies on Firefox-only
+Firefox **140+** (desktop only). This extension relies on Firefox-only
 container APIs (`contextualIdentities`) and has **no Chrome equivalent** —
 Chrome does not expose containers to extensions. See
 [architecture/overview.md](./docs/architecture/overview.md#why-firefox-only).
 
 ## License
 
-Provided as a starting point for personal use. The reference extensions it learns
-from ([Multi-Account Containers](https://github.com/mozilla/multi-account-containers),
+Licensed under the [GNU Affero General Public License v3.0 or later](./LICENSE)
+(AGPL-3.0-or-later). The reference extensions it learns from
+([Multi-Account Containers](https://github.com/mozilla/multi-account-containers),
 [Temporary Containers](https://github.com/stoically/temporary-containers),
 [Open URL in Container](https://github.com/honsiorovskyi/open-url-in-container))
 are MPL-2.0 licensed.

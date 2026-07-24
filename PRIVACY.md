@@ -1,10 +1,10 @@
-# Privacy Policy — Company Containers
+# Privacy Policy — Containers
 
 **Last updated:** 2026-07-19
 
 ## Summary
 
-Company Containers collects and transmits **no data** to the developer, to
+Better Containers collects and transmits **no data** to the developer, to
 Mozilla, or to any third party. Everything the extension stores lives only in
 your own browser profile, on your own device. There is no analytics, no
 telemetry, and no network request to any server the developer controls or

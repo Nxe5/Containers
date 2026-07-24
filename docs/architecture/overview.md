@@ -1,6 +1,6 @@
 # Architecture Overview
 
-Company Containers is a **Manifest V2** Firefox extension. MV2 (with a persistent
+Better Containers is a **Manifest V2** Firefox extension. MV2 (with a persistent
 background page) is used deliberately: the container-reassignment feature depends
 on **blocking `webRequest`**, which MV3 removed. See [Why Firefox-only](#why-firefox-only).
 

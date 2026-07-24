@@ -1,4 +1,4 @@
-# Company Containers — Documentation
+# Better Containers — Documentation
 
 This folder documents how the extension is built and how each feature works.
 For a quick overview and install instructions, see the [root README](../README.md).

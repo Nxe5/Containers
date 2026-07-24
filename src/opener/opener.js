@@ -36,7 +36,7 @@ async function closeSelf() {
       await browser.tabs.remove(tab.id);
     }
   } catch (err) {
-    console.warn('[Company Containers opener] could not close self', err);
+    console.warn('[Better Containers opener] could not close self', err);
   }
 }
 
@@ -73,25 +73,46 @@ async function openWithName(params) {
     )
   );
 
-  if (existing) {
-    await openTab(url, existing.cookieStoreId);
-    return;
-  }
-
-  // Ask before creating a brand-new container from an external link.
+  // Always confirm before honoring an external ext+container: link — whether
+  // that routes the URL into an existing (possibly logged-in) container or
+  // creates a new one. Any web page can trigger these links, so this prompt is
+  // the trust gate that stops hostile content from silently steering a URL of
+  // its choosing into a container the user is authenticated in.
   document.getElementById('loading').classList.add('hidden');
   document.getElementById('confirm').classList.remove('hidden');
   document.getElementById('confirmName').value = name;
   document.getElementById('confirmUrl').value = url;
 
-  document.getElementById('confirmBtn').onclick = async () => {
-    const response = await browser.runtime.sendMessage({
-      type: 'ensure-container',
-      name,
-      color,
-      icon,
-    });
-    await openTab(url, response.container.cookieStoreId);
+  const heading = document.getElementById('confirmHeading');
+  const intro = document.getElementById('confirmIntro');
+  const confirmBtn = document.getElementById('confirmBtn');
+
+  if (existing) {
+    heading.textContent = 'Open in this container?';
+    intro.textContent =
+      'This link wants to open the URL below in an existing container. ' +
+      'If you are signed in there, the page will load in that session.';
+    confirmBtn.textContent = 'Open';
+  } else {
+    heading.textContent = 'Create container?';
+    intro.textContent = "The link asks to open in a container that doesn't exist yet:";
+    confirmBtn.textContent = 'Create and open';
+  }
+
+  confirmBtn.onclick = async () => {
+    let cookieStoreId;
+    if (existing) {
+      cookieStoreId = existing.cookieStoreId;
+    } else {
+      const response = await browser.runtime.sendMessage({
+        type: 'ensure-container',
+        name,
+        color,
+        icon,
+      });
+      cookieStoreId = response.container.cookieStoreId;
+    }
+    await openTab(url, cookieStoreId);
   };
 
   document.getElementById('cancelBtn').onclick = closeSelf;
@@ -141,6 +162,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error('[Company Containers opener]', err);
+  console.error('[Better Containers opener]', err);
   showError(err.message || String(err));
 });

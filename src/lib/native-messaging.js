@@ -62,7 +62,7 @@ async function handleHostMessage(message) {
   } catch (err) {
     const error = err.message === 'vault-locked' ? 'vault-locked' : 'internal-error';
     if (error === 'internal-error') {
-      console.error('[Company Containers] native-messaging request failed', err);
+      console.error('[Better Containers] native-messaging request failed', err);
     }
     reply(id, { ok: false, error });
   }
@@ -91,7 +91,7 @@ function connect() {
     if (err && !hasWarned) {
       // Expected/common if the user hasn't run scripts/install-native-host.sh
       // yet; warn once instead of every retry.
-      console.warn('[Company Containers] native host unavailable:', err.message);
+      console.warn('[Better Containers] native host unavailable:', err.message);
       hasWarned = true;
     }
     port = null;

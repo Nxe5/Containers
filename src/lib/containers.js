@@ -76,7 +76,7 @@ export async function ensureContainers(settings, domainData) {
         });
         changed = true;
       } catch (err) {
-        console.warn('[Company Containers] failed to create container', key, err);
+        console.warn('[Better Containers] failed to create container', key, err);
         continue;
       }
     } else if (
@@ -92,7 +92,7 @@ export async function ensureContainers(settings, domainData) {
         });
         changed = true;
       } catch (err) {
-        console.warn('[Company Containers] failed to update container', found.cookieStoreId, err);
+        console.warn('[Better Containers] failed to update container', found.cookieStoreId, err);
       }
     }
 
@@ -175,7 +175,7 @@ export async function gcTemporaryContainers() {
         await browser.contextualIdentities.remove(id);
         removed.push(id);
       } catch (err) {
-        console.warn('[Company Containers] failed to remove temp container', id, err);
+        console.warn('[Better Containers] failed to remove temp container', id, err);
       }
       delete state.tempContainers[id];
     }

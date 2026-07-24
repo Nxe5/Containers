@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Open a URL in a specific Firefox container using the Company Containers
+# Open a URL in a specific Firefox container using the Containers
 # extension's ext+container protocol.
 #
 # Usage:

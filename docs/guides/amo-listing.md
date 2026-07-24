@@ -7,7 +7,7 @@ occasionally change.
 ## Name
 
 ```
-Company Containers
+Better Containers
 ```
 
 ## Summary
@@ -36,7 +36,7 @@ Plain text with paragraph breaks; AMO's editor supports basic formatting
 (bullets, bold) if you want to reproduce this with markup instead.
 
 ```
-Company Containers keeps the accounts you're logged into all the time
+Better Containers keeps the accounts you're logged into all the time
 separated automatically.
 
 Visit YouTube, Gmail, GitHub, or Amazon and the tab reopens in that site's own

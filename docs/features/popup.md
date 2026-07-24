@@ -11,7 +11,7 @@ At the top of the popup is a full-width button reflecting `settings.extensionEna
 - **Disabled** → "Extension Disabled — Click to Enable" (red), with a hint that
   auto-isolation and proxies are paused but manual actions still work.
 
-**Disabling** opens a confirmation overlay ("Disable Company Containers?") — the
+**Disabling** opens a confirmation overlay ("Disable Containers?") — the
 switch only flips after you confirm. **Enabling** is immediate (no confirm).
 
 The toggle is wired up **before** the popup's "no active tab" early-return, so it

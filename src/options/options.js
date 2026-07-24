@@ -1167,7 +1167,7 @@ async function init() {
 }
 
 init().catch((err) => {
-  console.error('[Company Containers options]', err);
+  console.error('[Better Containers options]', err);
   const notice = document.createElement('p');
   notice.className = 'hint danger-text';
   notice.textContent = `Error loading options: ${err.message}`;

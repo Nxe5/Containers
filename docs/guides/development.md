@@ -56,7 +56,7 @@ See the [source layout](../README.md#source-layout) in the docs index. In short:
   Don't touch `browser.proxy` or `connectNative` unless the permission is held.
 - **Secrets** go through `vault.js`, never into `settings`/`state`.
 - Match the surrounding style: small pure helpers, `browser.*` promises with
-  `async/await`, `[Company Containers]`-prefixed console logging.
+  `async/await`, `[Containers]`-prefixed console logging.
 
 ## Testing
 

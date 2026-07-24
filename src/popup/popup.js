@@ -1,5 +1,6 @@
 let currentStatus = null;
 let currentTabId = null;
+let currentCookieStoreId = null;
 let currentHostname = null;
 let currentAction = null;
 let vaultState = { exists: false, unlocked: false };
@@ -15,6 +16,7 @@ async function getCurrentTab() {
 async function loadStatus() {
   const tab = await getCurrentTab();
   currentTabId = tab?.id ?? null;
+  currentCookieStoreId = tab?.cookieStoreId || 'firefox-default';
 
   const status = await browser.runtime.sendMessage({ type: 'get-status' });
   currentStatus = status;
@@ -36,12 +38,43 @@ async function loadStatus() {
       type: 'vault-find-credentials-for-hostname',
       hostname: currentHostname,
     });
-    currentCredentialMatches = result.ok ? result.result : [];
+    const matches = result.ok ? result.result : [];
+    // Surface the credential(s) tagged to the tab's own container first, so
+    // the same site in different containers (e.g. personal Gmail vs. a work
+    // account) fills the login that belongs to where you actually are.
+    const ck = containerKeyForCookieStoreId(currentCookieStoreId);
+    currentCredentialMatches = matches
+      .slice()
+      .sort((a, b) => (b.containerKey === ck) - (a.containerKey === ck));
   } else {
     currentCredentialMatches = [];
   }
 
   return { status, tab };
+}
+
+// Reverse-lookup a tab's cookieStoreId to the built-in/custom container key
+// used to tag vault credentials. Mirrors getContainerKeyByCookieStoreId in
+// lib/rules.js, but runs in the popup against the status snapshot.
+function containerKeyForCookieStoreId(cookieStoreId) {
+  if (!cookieStoreId || !currentStatus) return null;
+  const s = currentStatus.settings || {};
+  for (const [key, cfg] of Object.entries(s.companies || {})) {
+    if (cfg?.cookieStoreId === cookieStoreId) return key;
+  }
+  for (const [key, cfg] of Object.entries(s.customContainers || {})) {
+    if (cfg?.cookieStoreId === cookieStoreId) return key;
+  }
+  return null;
+}
+
+function containerLabelForKey(key) {
+  if (!key) return '';
+  return (
+    currentStatus?.domainData?.[key]?.label ||
+    currentStatus?.settings?.customContainers?.[key]?.label ||
+    key
+  );
 }
 
 function getContainerConfig(key) {
@@ -351,26 +384,79 @@ async function init() {
   });
 
   // Fill login button.
-  document.getElementById('fillLoginBtn').addEventListener('click', async () => {
+  document.getElementById('fillLoginBtn').addEventListener('click', () => {
     if (currentCredentialMatches.length === 0 || !currentTabId) return;
-    const cred = currentCredentialMatches[0];
-    try {
-      await browser.tabs.executeScript(currentTabId, {
-        file: '/src/content/fill-login.js',
-      });
-      await browser.tabs.sendMessage(currentTabId, {
-        type: 'fill-login-credential',
-        account: cred.account,
-        password: cred.password,
-      });
-    } catch (err) {
-      console.error('[Company Containers] fill login failed', err);
+
+    // If exactly one saved login belongs to the tab's own container, that's
+    // unambiguously the right one — fill it directly. Otherwise (several
+    // container matches, or none tagged) let the user pick instead of
+    // silently guessing.
+    const ck = containerKeyForCookieStoreId(currentCookieStoreId);
+    const containerMatches = currentCredentialMatches.filter(
+      (c) => c.containerKey && c.containerKey === ck
+    );
+    if (containerMatches.length === 1) {
+      fillCredential(containerMatches[0]);
+    } else if (currentCredentialMatches.length === 1) {
+      fillCredential(currentCredentialMatches[0]);
+    } else {
+      openFillPicker();
     }
-    window.close();
+  });
+
+  document.getElementById('fillPickerCancel').addEventListener('click', () => {
+    document.getElementById('fillPickerOverlay').classList.add('hidden');
   });
 }
 
+async function fillCredential(cred) {
+  try {
+    await browser.tabs.executeScript(currentTabId, {
+      file: '/src/content/fill-login.js',
+    });
+    await browser.tabs.sendMessage(currentTabId, {
+      type: 'fill-login-credential',
+      account: cred.account,
+      password: cred.password,
+    });
+  } catch (err) {
+    console.error('[Better Containers] fill login failed', err);
+  }
+  window.close();
+}
+
+function openFillPicker() {
+  const overlay = document.getElementById('fillPickerOverlay');
+  const list = document.getElementById('fillPickerList');
+  const ck = containerKeyForCookieStoreId(currentCookieStoreId);
+  list.innerHTML = '';
+
+  for (const cred of currentCredentialMatches) {
+    const btn = document.createElement('button');
+    btn.className = 'secondary fill-picker-item';
+
+    const account = document.createElement('span');
+    account.className = 'fill-picker-account';
+    account.textContent = cred.account || '(no username)';
+    btn.appendChild(account);
+
+    const label = containerLabelForKey(cred.containerKey);
+    if (label) {
+      const meta = document.createElement('span');
+      meta.className = 'fill-picker-container';
+      meta.textContent =
+        cred.containerKey === ck ? `${label} · this container` : label;
+      btn.appendChild(meta);
+    }
+
+    btn.addEventListener('click', () => fillCredential(cred));
+    list.appendChild(btn);
+  }
+
+  overlay.classList.remove('hidden');
+}
+
 init().catch((err) => {
-  console.error('[Company Containers popup]', err);
+  console.error('[Better Containers popup]', err);
   document.getElementById('siteHint').textContent = 'Error loading popup';
 });

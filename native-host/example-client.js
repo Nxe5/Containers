@@ -2,7 +2,7 @@
 'use strict';
 
 /**
- * Minimal example of talking to the Company Containers native-messaging
+ * Minimal example of talking to the Containers native-messaging
  * bridge (native-host/index.js) from an external script — e.g. the
  * connection a Playwright automation would open before filling a login
  * form. This is a reference for the wire protocol, not a Playwright

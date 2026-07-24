@@ -33,7 +33,12 @@ export const DEFAULT_SETTINGS = Object.freeze({
   // link to a domain with its own dedicated container (e.g. github.com)
   // still hands off to that container so you land in your logged-in session
   // rather than staying in a disposable one.
-  stickyContainers: false,
+  // Defaults ON: without it, multi-domain login flows break. Google signs you
+  // in on accounts.google.com, which no container owns, so the Temporary
+  // Container fallback drops each auth hop into a fresh disposable jar and the
+  // login cookies never survive the redirect ("cookies disabled"). Keeping the
+  // redirect in the container that started it lets those cookies persist.
+  stickyContainers: true,
 
   // Per-company toggles and the cookieStoreId of the container we created.
   // cookieStoreId is persisted after first run.
