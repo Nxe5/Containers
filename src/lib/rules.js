@@ -95,10 +95,17 @@ export function getContainerProxy(containerKey, settings) {
  * Precedence:
  *   1. One-shot external hint for this exact URL.
  *   2. User rule.
- *   3. Sticky containers (only if enabled): stay in the current tab's
+ *   3. Linked new tab (fromLinkedTab): a tab opened by a link/window.open
+ *      from within any non-default container stays in that container.
+ *   4. Sticky containers (only if enabled): stay in the current tab's
  *      container if it's already a named (built-in or custom) container.
- *   4. Enabled company default.
- *   5. Temporary container fallback (only if enabled).
+ *   5. Enabled company default.
+ *   6. Temporary container fallback (only if enabled).
+ *
+ * `fromLinkedTab` is computed by the caller (the background engine) because it
+ * needs the opener + fresh-tab signals only available there; it already folds
+ * in the keepLinkedTabsInContainer setting. Defaults false so callers that
+ * only need domain resolution (popup display, etc.) are unaffected.
  *
  * Returns { cookieStoreId, reason } where reason is a short string.
  */
@@ -110,6 +117,7 @@ export function resolveTarget({
   settings,
   state,
   allowTempFallback = true,
+  fromLinkedTab = false,
 }) {
   const h = normalizeHostname(hostname);
 
@@ -127,7 +135,23 @@ export function resolveTarget({
     return { cookieStoreId: userMatch, reason: 'user-rule' };
   }
 
-  // 3. Sticky containers. Once you're inside a named container, links it
+  // 3. Linked new tab. A tab opened by a link (or window.open) from inside a
+  // container inherits that container from Firefox. Keep it there — even a
+  // Temporary Container, and even when the URL matches a preset company that
+  // owns its own container — so opening a link in a new tab never pulls you
+  // out of the context you were browsing. Broader than sticky (which excludes
+  // Temporary Containers), but narrower in trigger: the caller only sets
+  // fromLinkedTab on the new tab's first navigation, so same-tab navigations
+  // still hand off by domain rule. An explicit user rule above still wins.
+  if (
+    fromLinkedTab &&
+    currentCookieStoreId &&
+    currentCookieStoreId !== 'firefox-default'
+  ) {
+    return { cookieStoreId: currentCookieStoreId, reason: 'linked-tab' };
+  }
+
+  // 4. Sticky containers. Once you're inside a named container, links it
   // opens (including in a new tab, since Firefox already assigns the
   // opener's container to it) stay there instead of being moved by a
   // company rule or the temporary-container fallback below. Deliberately
@@ -143,7 +167,7 @@ export function resolveTarget({
     return { cookieStoreId: currentCookieStoreId, reason: 'sticky' };
   }
 
-  // 4. Company defaults.
+  // 5. Company defaults.
   const companyKey = matchCompany(h, domainData, settings);
   if (companyKey && isCompanyEnabled(companyKey, settings)) {
     const id = getCompanyCookieStoreId(companyKey, settings);
@@ -152,7 +176,7 @@ export function resolveTarget({
     }
   }
 
-  // 5. Temporary container fallback.
+  // 6. Temporary container fallback.
   if (
     allowTempFallback &&
     settings?.isolateUnmatched &&

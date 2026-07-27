@@ -90,6 +90,50 @@ const r9 = resolveTarget({
 });
 assert(r9.cookieStoreId === 'firefox-container-10' && r9.reason === 'company:google', 'sticky does not block first entry from the default container');
 
+// fromLinkedTab — a new tab opened by a link from inside any non-default
+// container stays in that container, even a Temporary one and even when the
+// URL matches a preset company. The background engine sets fromLinkedTab only
+// on the new tab's first navigation.
+const r10 = resolveTarget({
+  hostname: 'youtube.com',
+  currentCookieStoreId: 'firefox-container-99',
+  domainData,
+  settings,
+  state,
+  fromLinkedTab: true,
+});
+assert(r10.cookieStoreId === 'firefox-container-99' && r10.reason === 'linked-tab', 'linked tab stays in a temp container over a company match');
+
+const r11 = resolveTarget({
+  hostname: 'facebook.com',
+  currentCookieStoreId: 'firefox-container-10',
+  domainData,
+  settings,
+  state,
+  fromLinkedTab: true,
+});
+assert(r11.cookieStoreId === 'firefox-container-10' && r11.reason === 'linked-tab', 'linked tab stays in a named container over a different company match');
+
+const r12 = resolveTarget({
+  hostname: 'youtube.com',
+  currentCookieStoreId: 'firefox-default',
+  domainData,
+  settings,
+  state,
+  fromLinkedTab: true,
+});
+assert(r12.cookieStoreId === 'firefox-container-10' && r12.reason === 'company:google', 'linked tab from the default container still enters a company container');
+
+const r13 = resolveTarget({
+  hostname: 'work.example.com',
+  currentCookieStoreId: 'firefox-container-10',
+  domainData,
+  settings,
+  state,
+  fromLinkedTab: true,
+});
+assert(r13.cookieStoreId === 'firefox-container-30' && r13.reason === 'user-rule', 'an explicit user rule still wins over a linked tab');
+
 // looksLikeAuthNavigation — the URL half of preserveAuthFlows (redirect-chain
 // tracking, the other half, lives in the background engine and needs a live
 // webRequest to exercise).

@@ -252,6 +252,17 @@ async function handleBeforeRequest(details) {
   const url = new URL(details.url);
   const currentCookieStoreId = tab.cookieStoreId || 'firefox-default';
 
+  // A new tab opened from a link/window.open carries an openerTabId and, from
+  // Firefox, its opener's container. On that tab's first navigation, treat it
+  // as "linked" so resolveTarget keeps it in the container it came from
+  // instead of handing off by domain rule. tab.openerTabId is only present on
+  // tabs spawned by another tab; isFreshTab confines this to the first load
+  // (later same-tab navigations in that tab resolve normally).
+  const fromLinkedTab =
+    settings.keepLinkedTabsInContainer &&
+    tab.openerTabId != null &&
+    isFreshTab(tab, details.url);
+
   const target = resolveTarget({
     hostname: url.hostname,
     url: details.url,
@@ -260,6 +271,7 @@ async function handleBeforeRequest(details) {
     settings,
     state,
     allowTempFallback: true,
+    fromLinkedTab,
   });
 
   let targetCookieStoreId = target.cookieStoreId;
@@ -451,6 +463,12 @@ async function handleMessage(message, sender, sendResponse) {
 
     case 'set-preserve-auth-flows': {
       settings.preserveAuthFlows = message.value;
+      await saveSettings(settings);
+      return { settings };
+    }
+
+    case 'set-keep-linked-tabs': {
+      settings.keepLinkedTabsInContainer = message.value;
       await saveSettings(settings);
       return { settings };
     }

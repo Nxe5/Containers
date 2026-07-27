@@ -52,6 +52,17 @@ export const DEFAULT_SETTINGS = Object.freeze({
   // wrong account if the starting container held a different GitHub login.
   preserveAuthFlows: true,
 
+  // When a link (or window.open) opens a NEW tab from inside a container,
+  // Firefox assigns the new tab the opener's container. Keep it there — even
+  // a Temporary Container, and even when the URL matches a preset company
+  // domain that owns its own container — so deliberately opening a link in a
+  // new tab never yanks you out of the context you were browsing. Unlike
+  // stickyContainers (which also covers same-tab navigations and excludes
+  // Temporary Containers), this fires only on the new tab's first navigation
+  // and applies to every non-default origin container. Same-tab navigations
+  // are unaffected and still hand off by domain rule as before.
+  keepLinkedTabsInContainer: true,
+
   // Per-company toggles and the cookieStoreId of the container we created.
   // cookieStoreId is persisted after first run.
   companies: {
