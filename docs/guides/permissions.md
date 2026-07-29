@@ -11,6 +11,7 @@ the AMO submission.
 | `cookies` | Container cookie stores (`cookieStoreId`) are the identity of each container; used to place tabs. |
 | `storage` | Persist `settings` and `state` and the encrypted vault blob in `storage.local`. |
 | `tabs` | Read the active tab's URL and reopen tabs in the correct container. |
+| `webNavigation` | Detect when a tab or **window** is opened from a link/`window.open` (`onCreatedNavigationTarget`) so it can be kept in its opener's container. `tab.openerTabId` alone misses cross-window opens. |
 | `webRequest` + `webRequestBlocking` | Intercept top-level navigations (`onBeforeRequest`) to reopen them in the right container, and answer proxy auth (`onAuthRequired`). Blocking is essential — the request must be cancelled/redirected before it proceeds. This is why the extension is Manifest V2. |
 | `idle` | Auto-lock the vault after a period of inactivity. |
 | `<all_urls>` | Isolation must work on **any** site the user navigates to, so the navigation listener has to observe all URLs. No data is sent anywhere — matching happens locally. |

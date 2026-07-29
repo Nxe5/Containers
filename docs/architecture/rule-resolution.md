@@ -15,9 +15,10 @@ Signals are checked **in this order**, highest priority first. The first match w
    "reopen in X" is never immediately overridden by a domain rule.
 2. **User override** — a `hostname → container` rule from the Options page. Matches
    the exact host or any subdomain of it.
-3. **Linked new tab** (only if `keepLinkedTabsInContainer` is on) — the navigation is
-   the first load of a tab opened by a link/`window.open` from inside any non-default
-   container. Stay in that container. See [below](#linked-new-tabs).
+3. **Linked new tab or window** (only if `keepLinkedTabsInContainer` is on) — the
+   navigation is the first load of a tab (or new window) opened by a link/`window.open`
+   from inside any non-default container. Stay in that container. See
+   [below](#linked-new-tabs-and-windows).
 4. **Sticky containers** (only if `stickyContainers` is on) — if the tab is already in
    a named container, stay there. See [below](#sticky-containers).
 5. **Company / custom default** — the hostname matches a built-in company's domain
@@ -33,20 +34,28 @@ the result is `no-match` and the tab is left where it is.
 > behavior in code. An explicit action should always win for the navigation it
 > triggered.
 
-## Linked new tabs
+## Linked new tabs and windows
 
-With `settings.keepLinkedTabsInContainer` on (the default), a tab opened by a link
-(or `window.open`) from inside a container stays in the container it came from — even
-a Temporary Container, and even when the destination matches a preset company that
-owns its own container. Deliberately opening a link in a new tab should never pull
-you out of the context you were browsing.
+With `settings.keepLinkedTabsInContainer` on (the default), a tab **or window** opened
+by a link (or `window.open`) from inside a container stays in the container it came
+from — even a Temporary Container, and even when the destination matches a preset
+company that owns its own container. Deliberately opening a link in a new tab or window
+should never pull you out of the context you were browsing.
 
-The background engine detects this in `handleBeforeRequest()` and passes
-`fromLinkedTab` into `resolveTarget()`. Two signals gate it: `tab.openerTabId` is set
-(Firefox only populates it on tabs spawned by another tab), and `isFreshTab()` is true
-(so it fires only on the new tab's **first** navigation — later same-tab navigations in
-that tab resolve normally). Firefox already assigns the new tab its opener's container
-before the listener runs, so `currentCookieStoreId` is correct with no extra bookkeeping.
+The background engine detects this in `handleBeforeRequest()` and passes `fromLinkedTab`
+into `resolveTarget()`. Two conditions gate it:
+
+- The tab was **opened to host a navigation** from another tab. Primary signal:
+  `webNavigation.onCreatedNavigationTarget` records the new tab's id in `linkedTabIds`.
+  This is the only signal that also fires for opens into a **new window** —
+  `tab.openerTabId` is populated only when the opener is in the *same* window, so it's
+  kept as a same-window fallback in case the webNavigation event races the request.
+- `isFreshTab()` is true, so it fires only on the tab's **first** navigation; later
+  same-tab navigations resolve normally.
+
+Firefox already assigns the new tab (or window) its opener's container before the
+listener runs, so `currentCookieStoreId` is correct with no extra bookkeeping. The
+`linkedTabIds` entry is dropped on `tabs.onRemoved`.
 
 This differs from [sticky containers](#sticky-containers) in both directions: it's
 **broader** because it also keeps Temporary Containers (sticky hands those off), and

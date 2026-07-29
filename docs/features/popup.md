@@ -40,8 +40,9 @@ switch, it's bound before the "no active tab" early-return, so it always works.
   [rule-resolution.md](../architecture/rule-resolution.md#sticky-containers)), and
   "Keep sign-in flows where they start" (`preserveAuthFlows` — see
   [rule-resolution.md](../architecture/rule-resolution.md#sign-in-flow-preservation)),
-  and "Keep new tabs in their origin container" (`keepLinkedTabsInContainer` — see
-  [rule-resolution.md](../architecture/rule-resolution.md#linked-new-tabs)).
+  and "Keep new tabs and windows in their origin container"
+  (`keepLinkedTabsInContainer` — see
+  [rule-resolution.md](../architecture/rule-resolution.md#linked-new-tabs-and-windows)).
 - **Containers list** — searchable; click any container to open/reopen there. Also
   offers "Default (no container)" and "Temporary Container".
 

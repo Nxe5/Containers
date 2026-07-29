@@ -28,6 +28,7 @@
     "cookies",
     "storage",
     "tabs",
+    "webNavigation",
     "webRequest",
     "webRequestBlocking",
     "idle",

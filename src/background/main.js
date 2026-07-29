@@ -69,6 +69,15 @@ const processedRequests = new Set();
 // handleBeforeRequest. Entries are removed when the request completes or
 // errors, so the set stays small.
 const redirectChainRequests = new Set();
+// tabIds of tabs (and new-window tabs) that were opened to host a navigation
+// from another tab — a link, "open in new tab/window", or window.open. Firefox
+// gives such a tab its opener's container; membership here marks it so its
+// first navigation is kept in that container instead of being handed off by a
+// domain rule (see the keepLinkedTabsInContainer guard in handleBeforeRequest).
+// Populated by webNavigation.onCreatedNavigationTarget, which — unlike
+// tab.openerTabId — also reports opens into a *new window*. Cleaned up when the
+// tab is removed; the isFreshTab check confines the effect to the first load.
+const linkedTabIds = new Set();
 
 async function loadDomainData() {
   const url = browser.runtime.getURL('/src/data/domains.json');
@@ -252,15 +261,17 @@ async function handleBeforeRequest(details) {
   const url = new URL(details.url);
   const currentCookieStoreId = tab.cookieStoreId || 'firefox-default';
 
-  // A new tab opened from a link/window.open carries an openerTabId and, from
-  // Firefox, its opener's container. On that tab's first navigation, treat it
-  // as "linked" so resolveTarget keeps it in the container it came from
-  // instead of handing off by domain rule. tab.openerTabId is only present on
-  // tabs spawned by another tab; isFreshTab confines this to the first load
-  // (later same-tab navigations in that tab resolve normally).
+  // A tab (or new window) opened from a link/window.open inherits its opener's
+  // container from Firefox. On that tab's first navigation, treat it as
+  // "linked" so resolveTarget keeps it in the container it came from instead
+  // of handing off by domain rule. Two signals: linkedTabIds (recorded by
+  // webNavigation.onCreatedNavigationTarget — the only one that also covers
+  // opens into a new window) or tab.openerTabId (same-window fallback, in case
+  // the webNavigation event races the request). isFreshTab confines it to the
+  // first load; later same-tab navigations in that tab resolve normally.
   const fromLinkedTab =
     settings.keepLinkedTabsInContainer &&
-    tab.openerTabId != null &&
+    (linkedTabIds.has(details.tabId) || tab.openerTabId != null) &&
     isFreshTab(tab, details.url);
 
   const target = resolveTarget({
@@ -731,7 +742,18 @@ async function init() {
     ['blocking']
   );
 
-  browser.tabs.onRemoved.addListener(() => scheduleGc());
+  // Mark tabs opened to host a navigation from another tab (link, "open in new
+  // tab/window", window.open). Fires for opens into a new window too, which
+  // tab.openerTabId misses. Read once on the new tab's first navigation and
+  // dropped when the tab goes away — see the keepLinkedTabsInContainer guard.
+  browser.webNavigation.onCreatedNavigationTarget.addListener((details) => {
+    linkedTabIds.add(details.tabId);
+  });
+
+  browser.tabs.onRemoved.addListener((tabId) => {
+    linkedTabIds.delete(tabId);
+    scheduleGc();
+  });
   browser.tabs.onDetached.addListener(() => scheduleGc());
 
   browser.runtime.onMessage.addListener(handleMessage);
