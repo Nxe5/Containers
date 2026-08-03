@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Better Containers",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Auto-isolate YouTube, Gmail, GitHub, and Amazon in their own containers; unmatched sites open in temporary containers.",
   "homepage_url": "https://github.com/Nxe5/Containers",
   "icons": {
@@ -50,7 +50,9 @@
       "id": "{d2e31876-bc5b-4d3c-b649-4b1faec96a87}",
       "strict_min_version": "140.0",
       "data_collection_permissions": {
-        "required": ["none"]
+        "required": [
+          "none"
+        ]
       }
     }
   }
