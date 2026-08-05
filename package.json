@@ -1,6 +1,6 @@
 {
   "name": "better-containers",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "private": true,
   "description": "Firefox extension that auto-isolates YouTube, Gmail, GitHub, and Amazon into containers, with everything else falling back to Temporary Containers.",
   "license": "AGPL-3.0-or-later",
