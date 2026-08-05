@@ -69,16 +69,24 @@ const processedRequests = new Set();
 // handleBeforeRequest. Entries are removed when the request completes or
 // errors, so the set stays small.
 const redirectChainRequests = new Set();
-// tabIds of tabs (and new-window tabs) that were opened to host a navigation
-// from another tab — a link, "open in new tab/window", or window.open. Firefox
-// gives such a tab its opener's container; membership here marks it so its
-// first navigation is kept in that container instead of being handed off by a
-// domain rule (see the fromLinkedTab guard in handleBeforeRequest — the
-// new-tab/window half of the stickyContainers setting). Populated by
-// webNavigation.onCreatedNavigationTarget, which — unlike tab.openerTabId —
-// also reports opens into a *new window*. Consumed on the first navigation and
-// dropped when the tab is removed.
-const linkedTabIds = new Set();
+// tabId -> expiry timestamp for tabs (and new-window tabs) opened to host a
+// navigation from another tab — a link, "open in new tab/window", or
+// window.open. Firefox gives such a tab its opener's container; an unexpired
+// entry marks it so navigations are kept in that container instead of being
+// handed off by a domain rule (see the fromLinkedTab guard in
+// handleBeforeRequest — the new-tab/window half of the stickyContainers
+// setting). Populated by webNavigation.onCreatedNavigationTarget, which —
+// unlike tab.openerTabId — also reports opens into a *new window*.
+//
+// It's a short time window rather than a single-use flag on purpose: link
+// redirectors (DuckDuckGo's /l/, Google's /url) open the redirector URL first
+// and then reach the real destination via a *client-side* (JS) redirect, which
+// is a fresh top-level request — a single-use flag would be spent on the
+// redirector and let the destination hand off. The window covers the whole
+// initial redirect chain; genuine same-tab navigations that happen later fall
+// back to normal resolution. Entries are cleared when the tab is removed.
+const LINKED_TAB_TTL_MS = 5000;
+const linkedTabs = new Map();
 
 async function loadDomainData() {
   const url = browser.runtime.getURL('/src/data/domains.json');
@@ -267,27 +275,29 @@ async function handleBeforeRequest(details) {
   const currentCookieStoreId = tab.cookieStoreId || 'firefox-default';
 
   // A tab (or new window) opened from a link/window.open inherits its opener's
-  // container from Firefox. Keep that first navigation in the container it came
-  // from instead of handing off by a domain rule. This is the new-tab/window
-  // half of the "keep links in their origin container" setting
+  // container from Firefox. Keep navigations during its initial load in the
+  // container it came from instead of handing off by a domain rule. This is the
+  // new-tab/window half of the "keep links in their origin container" setting
   // (stickyContainers); the same-tab half lives in resolveTarget.
   //
-  // Primary signal: webNavigation.onCreatedNavigationTarget recorded this tab
-  // in linkedTabIds — the only signal that also covers opens into a new window.
-  // It's authoritative for this navigation, so we do NOT also require
-  // isFreshTab (a just-created tab's url is often still "" or about:blank here,
-  // which used to make this check spuriously fail and let the domain rule win).
-  // We consume the entry so only the first load is kept; later same-tab
-  // navigations resolve normally.
+  // Primary signal: webNavigation.onCreatedNavigationTarget put this tab in
+  // linkedTabs with a short expiry — the only signal that also covers opens into
+  // a new window, and a window rather than a one-shot flag so it survives the
+  // client-side redirect that link redirectors (DuckDuckGo /l/, Google /url)
+  // use to reach the real destination. No isFreshTab check here: a just-created
+  // tab's url is often still "" or about:blank at this point, and the redirect
+  // hop's url isn't "fresh" at all.
   //
   // Fallback: tab.openerTabId (same-window only) in case that event raced this
   // request. openerTabId persists for the tab's life, so this path still needs
   // isFreshTab to avoid catching later navigations.
   let fromLinkedTab = false;
   if (settings.stickyContainers) {
-    if (linkedTabIds.has(details.tabId)) {
-      linkedTabIds.delete(details.tabId);
+    const linkedUntil = linkedTabs.get(details.tabId);
+    if (linkedUntil != null && linkedUntil > Date.now()) {
       fromLinkedTab = true;
+    } else if (linkedUntil != null) {
+      linkedTabs.delete(details.tabId); // expired; tidy up
     } else if (tab.openerTabId != null && isFreshTab(tab, details.url)) {
       fromLinkedTab = true;
     }
@@ -759,15 +769,17 @@ async function init() {
   );
 
   // Mark tabs opened to host a navigation from another tab (link, "open in new
-  // tab/window", window.open). Fires for opens into a new window too, which
-  // tab.openerTabId misses. Read once on the new tab's first navigation and
-  // dropped when the tab goes away — see the fromLinkedTab guard.
+  // tab/window", window.open) with a short keep-in-origin-container window.
+  // Fires for opens into a new window too, which tab.openerTabId misses. The
+  // window (not a one-shot flag) covers the initial redirect chain, including
+  // the client-side redirect used by link redirectors — see the fromLinkedTab
+  // guard. Cleared when the tab goes away.
   browser.webNavigation.onCreatedNavigationTarget.addListener((details) => {
-    linkedTabIds.add(details.tabId);
+    linkedTabs.set(details.tabId, Date.now() + LINKED_TAB_TTL_MS);
   });
 
   browser.tabs.onRemoved.addListener((tabId) => {
-    linkedTabIds.delete(tabId);
+    linkedTabs.delete(tabId);
     scheduleGc();
   });
   browser.tabs.onDetached.addListener(() => scheduleGc());

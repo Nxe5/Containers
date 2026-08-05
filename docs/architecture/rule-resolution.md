@@ -54,18 +54,29 @@ The engine detects this in `handleBeforeRequest()` and passes `fromLinkedTab` in
 tab:
 
 - Primary signal: `webNavigation.onCreatedNavigationTarget` records the new tab's id in
-  `linkedTabIds`. It's the only signal that also fires for opens into a **new window** —
-  `tab.openerTabId` is populated only when the opener is in the *same* window. The entry
-  is **consumed** on the first navigation (so later same-tab navigations fall through to
-  the same-tab half) and dropped on `tabs.onRemoved`. It is trusted directly and is
-  *not* also gated on `isFreshTab()`, because a just-created tab's URL is often still
-  empty or `about:blank` at request time — gating on it there caused the linked tab to
-  spuriously hand off.
+  `linkedTabs` with a short expiry (`LINKED_TAB_TTL_MS`). It's the only signal that also
+  fires for opens into a **new window** — `tab.openerTabId` is populated only when the
+  opener is in the *same* window. It is trusted directly and is *not* also gated on
+  `isFreshTab()`, because a just-created tab's URL is often still empty or `about:blank`
+  at request time — gating on it there caused the linked tab to spuriously hand off.
 - Fallback: `tab.openerTabId` (same-window only), used with `isFreshTab()` in case the
   webNavigation event races the request.
 
 Firefox already assigns the new tab (or window) its opener's container before the
 listener runs, so `currentCookieStoreId` is correct with no extra bookkeeping.
+
+**Why a time window, not a one-shot flag.** Link redirectors — DuckDuckGo's
+`duckduckgo.com/l/?uddg=…` and Google's `/url?q=…` — don't link straight to the target.
+The new tab first loads the redirector URL, which then reaches the real destination via
+a **client-side (JavaScript) redirect**, i.e. a fresh top-level request. A single-use
+flag would be spent keeping the *redirector* in the origin container and the destination
+would then hand off. The `linkedTabs` window (a few seconds) covers the whole initial
+redirect chain — client-side *and* server-side — so the destination stays put too.
+Genuine same-tab navigations the user makes later, after the window lapses, fall through
+to the same-tab half below and resolve normally. (Server-side redirect chains are also
+independently protected by [`preserveAuthFlows`](#sign-in-flow-preservation) via
+`requestId`; the window is what additionally covers *client-side* redirects.) The entry
+is dropped on `tabs.onRemoved`.
 
 ### Same tab (precedence rule 4)
 
