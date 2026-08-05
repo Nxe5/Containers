@@ -200,7 +200,6 @@ function renderGlobals() {
   $('isolateUnmatched').checked = s.isolateUnmatched !== false;
   $('stickyContainers').checked = s.stickyContainers === true;
   $('preserveAuthFlows').checked = s.preserveAuthFlows !== false;
-  $('keepLinkedTabsInContainer').checked = s.keepLinkedTabsInContainer !== false;
   $('tempPrefix').value = s.tempPrefix || 'Temp';
   populateSelect($('tempColor'), COLORS, s.tempColor || 'toolbar');
   populateSelect($('tempIcon'), ICONS, s.tempIcon || 'circle');
@@ -913,7 +912,6 @@ async function saveGlobals() {
       isolateUnmatched: $('isolateUnmatched').checked,
       stickyContainers: $('stickyContainers').checked,
       preserveAuthFlows: $('preserveAuthFlows').checked,
-      keepLinkedTabsInContainer: $('keepLinkedTabsInContainer').checked,
       tempPrefix: $('tempPrefix').value.trim() || 'Temp',
       tempColor: $('tempColor').value,
       tempIcon: $('tempIcon').value,
@@ -1146,7 +1144,6 @@ async function init() {
   $('isolateUnmatched').addEventListener('change', saveGlobals);
   $('stickyContainers').addEventListener('change', saveGlobals);
   $('preserveAuthFlows').addEventListener('change', saveGlobals);
-  $('keepLinkedTabsInContainer').addEventListener('change', saveGlobals);
   $('tempPrefix').addEventListener('change', saveGlobals);
   $('tempColor').addEventListener('change', saveGlobals);
   $('tempIcon').addEventListener('change', saveGlobals);

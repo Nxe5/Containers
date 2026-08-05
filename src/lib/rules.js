@@ -95,17 +95,19 @@ export function getContainerProxy(containerKey, settings) {
  * Precedence:
  *   1. One-shot external hint for this exact URL.
  *   2. User rule.
- *   3. Linked new tab (fromLinkedTab): a tab opened by a link/window.open
- *      from within any non-default container stays in that container.
+ *   3. Linked new tab/window (fromLinkedTab): a tab or window opened by a
+ *      link/window.open from within any non-default container stays in that
+ *      container. The new-tab/window half of stickyContainers.
  *   4. Sticky containers (only if enabled): stay in the current tab's
- *      container if it's already a named (built-in or custom) container.
+ *      container if it's already a named (built-in or custom) container. The
+ *      same-tab half of stickyContainers.
  *   5. Enabled company default.
  *   6. Temporary container fallback (only if enabled).
  *
  * `fromLinkedTab` is computed by the caller (the background engine) because it
  * needs the opener + fresh-tab signals only available there; it already folds
- * in the keepLinkedTabsInContainer setting. Defaults false so callers that
- * only need domain resolution (popup display, etc.) are unaffected.
+ * in the stickyContainers setting. Defaults false so callers that only need
+ * domain resolution (popup display, etc.) are unaffected.
  *
  * Returns { cookieStoreId, reason } where reason is a short string.
  */
@@ -135,14 +137,15 @@ export function resolveTarget({
     return { cookieStoreId: userMatch, reason: 'user-rule' };
   }
 
-  // 3. Linked new tab. A tab opened by a link (or window.open) from inside a
-  // container inherits that container from Firefox. Keep it there — even a
-  // Temporary Container, and even when the URL matches a preset company that
-  // owns its own container — so opening a link in a new tab never pulls you
-  // out of the context you were browsing. Broader than sticky (which excludes
-  // Temporary Containers), but narrower in trigger: the caller only sets
-  // fromLinkedTab on the new tab's first navigation, so same-tab navigations
-  // still hand off by domain rule. An explicit user rule above still wins.
+  // 3. Linked new tab/window. A tab or window opened by a link (or
+  // window.open) from inside a container inherits that container from Firefox.
+  // Keep it there — even a Temporary Container, and even when the URL matches a
+  // preset company that owns its own container — so opening a link in a new tab
+  // or window never pulls you out of the context you were browsing. This is the
+  // new-tab/window half of stickyContainers; unlike the same-tab half below it
+  // also covers Temporary Containers, but the caller only sets fromLinkedTab on
+  // the first navigation of a link-opened tab, so ordinary same-tab navigations
+  // fall through to rule 4. An explicit user rule above still wins.
   if (
     fromLinkedTab &&
     currentCookieStoreId &&
@@ -151,13 +154,13 @@ export function resolveTarget({
     return { cookieStoreId: currentCookieStoreId, reason: 'linked-tab' };
   }
 
-  // 4. Sticky containers. Once you're inside a named container, links it
-  // opens (including in a new tab, since Firefox already assigns the
-  // opener's container to it) stay there instead of being moved by a
-  // company rule or the temporary-container fallback below. Deliberately
-  // does not apply inside a Temporary Container: a link to a domain with its
-  // own dedicated container should still hand off to it, landing in the
-  // logged-in session rather than staying in a disposable container.
+  // 4. Same-tab sticky (the same-tab half of stickyContainers). Once you're
+  // inside a named container, a same-tab navigation stays there instead of
+  // being moved by a company rule or the temporary-container fallback below.
+  // (New-tab/window opens are already handled by rule 3 above.) Deliberately
+  // does not apply inside a Temporary Container: a same-tab navigation to a
+  // domain with its own dedicated container should still hand off to it,
+  // landing in the logged-in session rather than staying in a disposable one.
   if (
     settings?.stickyContainers &&
     currentCookieStoreId &&

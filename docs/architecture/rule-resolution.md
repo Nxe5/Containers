@@ -15,12 +15,13 @@ Signals are checked **in this order**, highest priority first. The first match w
    "reopen in X" is never immediately overridden by a domain rule.
 2. **User override** — a `hostname → container` rule from the Options page. Matches
    the exact host or any subdomain of it.
-3. **Linked new tab or window** (only if `keepLinkedTabsInContainer` is on) — the
-   navigation is the first load of a tab (or new window) opened by a link/`window.open`
-   from inside any non-default container. Stay in that container. See
-   [below](#linked-new-tabs-and-windows).
-4. **Sticky containers** (only if `stickyContainers` is on) — if the tab is already in
-   a named container, stay there. See [below](#sticky-containers).
+3. **Linked new tab or window** (only if `stickyContainers` is on) — the navigation is
+   the first load of a tab (or new window) opened by a link/`window.open` from inside
+   any non-default container. Stay in that container. The new-tab/window half of "keep
+   links in their origin container"; see [below](#keep-links-in-their-origin-container-stickycontainers).
+4. **Same-tab sticky** (only if `stickyContainers` is on) — if the tab is already in a
+   named container, a same-tab navigation stays there. The same-tab half of the same
+   setting; see [below](#keep-links-in-their-origin-container-stickycontainers).
 5. **Company / custom default** — the hostname matches a built-in company's domain
    list (or a custom container's), and that container is enabled.
 6. **Temporary container fallback** — nothing matched. If "isolate unmatched" is on
@@ -34,62 +35,60 @@ the result is `no-match` and the tab is left where it is.
 > behavior in code. An explicit action should always win for the navigation it
 > triggered.
 
-## Linked new tabs and windows
+## Keep links in their origin container (`stickyContainers`)
 
-With `settings.keepLinkedTabsInContainer` on (the default), a tab **or window** opened
-by a link (or `window.open`) from inside a container stays in the container it came
-from — even a Temporary Container, and even when the destination matches a preset
-company that owns its own container. Deliberately opening a link in a new tab or window
-should never pull you out of the context you were browsing.
+One setting, on by default, with two halves. The intent is simple: a link should open
+in the container you were already in. It's split only because "new tab/window" and
+"same tab" need different handling around Temporary Containers.
 
-The background engine detects this in `handleBeforeRequest()` and passes `fromLinkedTab`
-into `resolveTarget()`. Two conditions gate it:
+### New tab or window (precedence rule 3)
 
-- The tab was **opened to host a navigation** from another tab. Primary signal:
-  `webNavigation.onCreatedNavigationTarget` records the new tab's id in `linkedTabIds`.
-  This is the only signal that also fires for opens into a **new window** —
-  `tab.openerTabId` is populated only when the opener is in the *same* window, so it's
-  kept as a same-window fallback in case the webNavigation event races the request.
-- `isFreshTab()` is true, so it fires only on the tab's **first** navigation; later
-  same-tab navigations resolve normally.
+A tab **or window** opened by a link (or `window.open`) from inside a container stays
+in the container it came from — **any** container, including a Temporary Container, and
+even when the destination matches a preset company that owns its own container.
+Deliberately opening a link in a new tab or window should never pull you out of the
+context you were browsing.
+
+The engine detects this in `handleBeforeRequest()` and passes `fromLinkedTab` into
+`resolveTarget()`. The tab must have been **opened to host a navigation** from another
+tab:
+
+- Primary signal: `webNavigation.onCreatedNavigationTarget` records the new tab's id in
+  `linkedTabIds`. It's the only signal that also fires for opens into a **new window** —
+  `tab.openerTabId` is populated only when the opener is in the *same* window. The entry
+  is **consumed** on the first navigation (so later same-tab navigations fall through to
+  the same-tab half) and dropped on `tabs.onRemoved`. It is trusted directly and is
+  *not* also gated on `isFreshTab()`, because a just-created tab's URL is often still
+  empty or `about:blank` at request time — gating on it there caused the linked tab to
+  spuriously hand off.
+- Fallback: `tab.openerTabId` (same-window only), used with `isFreshTab()` in case the
+  webNavigation event races the request.
 
 Firefox already assigns the new tab (or window) its opener's container before the
-listener runs, so `currentCookieStoreId` is correct with no extra bookkeeping. The
-`linkedTabIds` entry is dropped on `tabs.onRemoved`.
+listener runs, so `currentCookieStoreId` is correct with no extra bookkeeping.
 
-This differs from [sticky containers](#sticky-containers) in both directions: it's
-**broader** because it also keeps Temporary Containers (sticky hands those off), and
-**narrower** because it only triggers on a linked new tab's first load rather than every
-navigation. A one-shot hint or a user override, both checked first, still win — so an
-explicit "reopen in X" or a configured `hostname → container` rule takes precedence.
+### Same tab (precedence rule 4)
 
-Toggle it from the popup ("Keep new tabs in their origin container") or the Options
-page's Global settings.
+Once a tab is inside a **named** container (built-in or custom — anything except the
+default "no container" and except a Temporary Container), a same-tab navigation stays
+in that container instead of being moved by a company-domain match or the temp fallback.
 
-## Sticky containers
+This half **excludes** Temporary Containers on purpose: a same-tab navigation to a
+domain with its own dedicated container (e.g. typing/following `github.com` while
+browsing in a disposable temp container) still hands off to that dedicated container, so
+you land in your logged-in session rather than a throwaway one. (Sign-in *chains* are
+preserved regardless by [`preserveAuthFlows`](#sign-in-flow-preservation).)
 
-With `settings.stickyContainers` on, once a tab is inside a **named** container
-(built-in or custom — anything except the default "no container" and except a
-Temporary Container), links it opens stay in that same container instead of being
-moved by a company-domain match or the temp fallback. This covers links opened in a
-new tab too: Firefox already assigns a new tab the opener's container before our
-listener runs, so `currentCookieStoreId` is correct without any extra listener setup.
-
-It's deliberately scoped to **exclude** Temporary Containers: a link to a domain with
-its own dedicated container (e.g. a `github.com` link clicked while browsing in a
-disposable temp container) still hands off to that dedicated container, so you land
-in your logged-in session rather than staying in a throwaway one. A user override
-still wins over sticky, since it's checked first and is a more specific, deliberate
-signal.
-
-Toggle it from the popup ("Keep links in their origin container") or the Options
-page's Global settings.
+A one-shot hint or a user override, both checked first, still win over either half — so
+an explicit "reopen in X" or a configured `hostname → container` rule takes precedence.
+Toggle from the popup ("Keep links in their origin container") or the Options page.
 
 ## Sign-in flow preservation
 
-Sticky containers cover named containers only, which leaves two origins where an
-auth chain used to get yanked away mid-flow: Temporary Containers and "no
-container". Clicking **Login with GitHub** on a site would hop to
+The same-tab half of "keep links in their origin container" covers named containers
+only, which leaves two origins where a same-tab auth chain used to get yanked away
+mid-flow: Temporary Containers and "no container". Clicking **Login with GitHub** on a
+site would hop to
 `github.com/login/oauth/authorize`, match the GitHub company rule, and relocate
 the flow into the global GitHub container — completing the login as whatever
 account lives there instead of the one the starting container holds.

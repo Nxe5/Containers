@@ -73,10 +73,11 @@ const redirectChainRequests = new Set();
 // from another tab — a link, "open in new tab/window", or window.open. Firefox
 // gives such a tab its opener's container; membership here marks it so its
 // first navigation is kept in that container instead of being handed off by a
-// domain rule (see the keepLinkedTabsInContainer guard in handleBeforeRequest).
-// Populated by webNavigation.onCreatedNavigationTarget, which — unlike
-// tab.openerTabId — also reports opens into a *new window*. Cleaned up when the
-// tab is removed; the isFreshTab check confines the effect to the first load.
+// domain rule (see the fromLinkedTab guard in handleBeforeRequest — the
+// new-tab/window half of the stickyContainers setting). Populated by
+// webNavigation.onCreatedNavigationTarget, which — unlike tab.openerTabId —
+// also reports opens into a *new window*. Consumed on the first navigation and
+// dropped when the tab is removed.
 const linkedTabIds = new Set();
 
 async function loadDomainData() {
@@ -267,7 +268,9 @@ async function handleBeforeRequest(details) {
 
   // A tab (or new window) opened from a link/window.open inherits its opener's
   // container from Firefox. Keep that first navigation in the container it came
-  // from instead of handing off by a domain rule.
+  // from instead of handing off by a domain rule. This is the new-tab/window
+  // half of the "keep links in their origin container" setting
+  // (stickyContainers); the same-tab half lives in resolveTarget.
   //
   // Primary signal: webNavigation.onCreatedNavigationTarget recorded this tab
   // in linkedTabIds — the only signal that also covers opens into a new window.
@@ -281,7 +284,7 @@ async function handleBeforeRequest(details) {
   // request. openerTabId persists for the tab's life, so this path still needs
   // isFreshTab to avoid catching later navigations.
   let fromLinkedTab = false;
-  if (settings.keepLinkedTabsInContainer) {
+  if (settings.stickyContainers) {
     if (linkedTabIds.has(details.tabId)) {
       linkedTabIds.delete(details.tabId);
       fromLinkedTab = true;
@@ -493,12 +496,6 @@ async function handleMessage(message, sender, sendResponse) {
 
     case 'set-preserve-auth-flows': {
       settings.preserveAuthFlows = message.value;
-      await saveSettings(settings);
-      return { settings };
-    }
-
-    case 'set-keep-linked-tabs': {
-      settings.keepLinkedTabsInContainer = message.value;
       await saveSettings(settings);
       return { settings };
     }
@@ -764,7 +761,7 @@ async function init() {
   // Mark tabs opened to host a navigation from another tab (link, "open in new
   // tab/window", window.open). Fires for opens into a new window too, which
   // tab.openerTabId misses. Read once on the new tab's first navigation and
-  // dropped when the tab goes away — see the keepLinkedTabsInContainer guard.
+  // dropped when the tab goes away — see the fromLinkedTab guard.
   browser.webNavigation.onCreatedNavigationTarget.addListener((details) => {
     linkedTabIds.add(details.tabId);
   });

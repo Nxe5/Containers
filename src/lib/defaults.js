@@ -25,19 +25,25 @@ export const DEFAULT_SETTINGS = Object.freeze({
   // of opening a new tab next to it.
   replaceTabInsteadOfNew: false,
 
-  // Once a tab is already inside a named (built-in or custom) container,
-  // keep links it opens — including ones opened in a new tab, which Firefox
-  // already assigns the opener's container — in that same container instead
-  // of letting domain rules or the Temporary Container fallback move them
-  // elsewhere. Does not apply while already inside a Temporary Container: a
-  // link to a domain with its own dedicated container (e.g. github.com)
-  // still hands off to that container so you land in your logged-in session
-  // rather than staying in a disposable one.
-  // Defaults ON: without it, multi-domain login flows break. Google signs you
-  // in on accounts.google.com, which no container owns, so the Temporary
-  // Container fallback drops each auth hop into a fresh disposable jar and the
-  // login cookies never survive the redirect ("cookies disabled"). Keeping the
-  // redirect in the container that started it lets those cookies persist.
+  // Keep links you open in the container they came from instead of letting a
+  // domain rule or the Temporary Container fallback move them elsewhere. Two
+  // parts, both driven by this one setting:
+  //   - New tab / window: a link (or window.open) opened into a new tab or
+  //     window stays in the opener's container — ANY container, including a
+  //     Temporary Container, and even when the URL matches a preset company.
+  //     Deliberately opening a link elsewhere shouldn't yank you out of the
+  //     context you were browsing. (Detection: fromLinkedTab in main.js.)
+  //   - Same tab: navigating the current tab stays in the current container as
+  //     long as it's a NAMED container. A same-tab navigation from a Temporary
+  //     Container still hands off to a domain's dedicated container (e.g.
+  //     github.com) so you land in your logged-in session rather than a
+  //     disposable one; sign-in chains are preserved separately by
+  //     preserveAuthFlows.
+  // Defaults ON: without the same-tab half, multi-domain login flows break.
+  // Google signs you in on accounts.google.com, which no container owns, so the
+  // Temporary Container fallback drops each auth hop into a fresh disposable jar
+  // and the login cookies never survive the redirect ("cookies disabled").
+  // Keeping the redirect in the container that started it lets them persist.
   stickyContainers: true,
 
   // Keep sign-in flows in the container they started in, regardless of which
@@ -51,17 +57,6 @@ export const DEFAULT_SETTINGS = Object.freeze({
   // on some site gets yanked into the global GitHub container mid-flow —
   // wrong account if the starting container held a different GitHub login.
   preserveAuthFlows: true,
-
-  // When a link (or window.open) opens a NEW tab — or a new window — from
-  // inside a container, Firefox assigns it the opener's container. Keep it
-  // there — even a Temporary Container, and even when the URL matches a preset
-  // company domain that owns its own container — so deliberately opening a
-  // link in a new tab or window never yanks you out of the context you were
-  // browsing. Unlike stickyContainers (which also covers same-tab navigations
-  // and excludes Temporary Containers), this fires only on the new tab's first
-  // navigation and applies to every non-default origin container. Same-tab
-  // navigations are unaffected and still hand off by domain rule as before.
-  keepLinkedTabsInContainer: true,
 
   // Per-company toggles and the cookieStoreId of the container we created.
   // cookieStoreId is persisted after first run.

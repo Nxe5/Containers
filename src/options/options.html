@@ -22,15 +22,11 @@
         </label>
         <label class="toggle">
           <input type="checkbox" id="stickyContainers" />
-          <span>Keep links in their origin container (once already in a named container, links stay there instead of moving to another company's container or a Temporary Container)</span>
+          <span>Keep links in their origin container (a link opened in a new tab or window stays in the container it came from — including a Temporary Container — even when the URL matches a preset company; links that navigate the same tab stay put while you're in a named container)</span>
         </label>
         <label class="toggle">
           <input type="checkbox" id="preserveAuthFlows" />
           <span>Keep sign-in flows where they start (OAuth/SSO chains — "Login with GitHub" and the like — stay in the container the flow began in, even a Temporary Container or no container, instead of hopping to the provider's container mid-login)</span>
-        </label>
-        <label class="toggle">
-          <input type="checkbox" id="keepLinkedTabsInContainer" />
-          <span>Keep new tabs and windows in their origin container (a link that opens a new tab or window from inside any container — including a Temporary Container — stays there, even when the URL matches a preset company's container)</span>
         </label>
 
         <div class="grid three">

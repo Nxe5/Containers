@@ -277,7 +277,6 @@ function renderHome() {
   document.getElementById('replaceToggle').checked = status.settings.replaceTabInsteadOfNew === true;
   document.getElementById('stickyToggle').checked = status.settings.stickyContainers === true;
   document.getElementById('authFlowToggle').checked = status.settings.preserveAuthFlows !== false;
-  document.getElementById('linkedTabToggle').checked = status.settings.keepLinkedTabsInContainer !== false;
 
   // Container list.
   renderContainerList(document.getElementById('homeContainers'), document.getElementById('homeSearch').value);
@@ -388,14 +387,6 @@ async function init() {
   document.getElementById('authFlowToggle').addEventListener('change', async (e) => {
     await browser.runtime.sendMessage({
       type: 'set-preserve-auth-flows',
-      value: e.target.checked,
-    });
-    await loadStatus();
-  });
-
-  document.getElementById('linkedTabToggle').addEventListener('change', async (e) => {
-    await browser.runtime.sendMessage({
-      type: 'set-keep-linked-tabs',
       value: e.target.checked,
     });
     await loadStatus();
