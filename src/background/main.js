@@ -163,6 +163,10 @@ function updateActionBadge() {
 
 function isFreshTab(tab, targetUrl) {
   if (!tab) return false;
+  // A brand-new tab's URL is often still empty (or about:blank) at
+  // onBeforeRequest time, before its first load commits — treat that as fresh
+  // so a link-opened tab is recognised and can be replaced in place.
+  if (!tab.url) return true;
   if (FRESH_TAB_URLS.has(tab.url)) return true;
   // First navigation of a newly-created tab.
   if (tab.url === targetUrl) return true;
@@ -262,17 +266,29 @@ async function handleBeforeRequest(details) {
   const currentCookieStoreId = tab.cookieStoreId || 'firefox-default';
 
   // A tab (or new window) opened from a link/window.open inherits its opener's
-  // container from Firefox. On that tab's first navigation, treat it as
-  // "linked" so resolveTarget keeps it in the container it came from instead
-  // of handing off by domain rule. Two signals: linkedTabIds (recorded by
-  // webNavigation.onCreatedNavigationTarget — the only one that also covers
-  // opens into a new window) or tab.openerTabId (same-window fallback, in case
-  // the webNavigation event races the request). isFreshTab confines it to the
-  // first load; later same-tab navigations in that tab resolve normally.
-  const fromLinkedTab =
-    settings.keepLinkedTabsInContainer &&
-    (linkedTabIds.has(details.tabId) || tab.openerTabId != null) &&
-    isFreshTab(tab, details.url);
+  // container from Firefox. Keep that first navigation in the container it came
+  // from instead of handing off by a domain rule.
+  //
+  // Primary signal: webNavigation.onCreatedNavigationTarget recorded this tab
+  // in linkedTabIds — the only signal that also covers opens into a new window.
+  // It's authoritative for this navigation, so we do NOT also require
+  // isFreshTab (a just-created tab's url is often still "" or about:blank here,
+  // which used to make this check spuriously fail and let the domain rule win).
+  // We consume the entry so only the first load is kept; later same-tab
+  // navigations resolve normally.
+  //
+  // Fallback: tab.openerTabId (same-window only) in case that event raced this
+  // request. openerTabId persists for the tab's life, so this path still needs
+  // isFreshTab to avoid catching later navigations.
+  let fromLinkedTab = false;
+  if (settings.keepLinkedTabsInContainer) {
+    if (linkedTabIds.has(details.tabId)) {
+      linkedTabIds.delete(details.tabId);
+      fromLinkedTab = true;
+    } else if (tab.openerTabId != null && isFreshTab(tab, details.url)) {
+      fromLinkedTab = true;
+    }
+  }
 
   const target = resolveTarget({
     hostname: url.hostname,
@@ -294,6 +310,9 @@ async function handleBeforeRequest(details) {
   }
 
   if (!targetCookieStoreId || targetCookieStoreId === currentCookieStoreId) {
+    if (target.reason === 'linked-tab') {
+      console.log('[Better Containers] kept linked tab in', currentCookieStoreId, 'for', details.url);
+    }
     return {};
   }
 
